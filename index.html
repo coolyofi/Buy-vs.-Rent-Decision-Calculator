@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>上海购房 vs 租房 · 智能政策版</title>
+  <style>
+    body { font-family: "Microsoft YaHei", sans-serif; max-width: 950px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+    .section { background: white; padding: 16px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h1, h2 { color: #1a365d; }
+    label { display: inline-block; width: 240px; margin-top: 8px; }
+    input, select { width: 130px; padding: 6px; margin-left: 10px; }
+    button { background: #2c7be5; color: white; border: none; padding: 10px 24px; margin-top: 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #1a5fb4; }
+    .result { margin-top: 20px; padding: 16px; background: #eef7ff; border-left: 5px solid #2c7be5; }
+    .alert { background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin: 10px 0; }
+    .error { background: #f8d7da; color: #721c24; }
+    .success { background: #d4edda; color: #155724; }
+    .highlight { font-weight: bold; color: #d32f2f; }
+    details { margin-top: 15px; }
+    summary { cursor: pointer; font-weight: bold; color: #1a73e8; }
+  </style>
+</head>
+<body>
+
+<h1>🏠 上海购房 vs 租房 · 智能政策合规版（2026）</h1>
+
+<div class="section">
+  <h2>1. 购房者身份信息</h2>
+  <label>户籍类型：</label>
+  <select id="hukou">
+    <option value="shanghai">上海户籍</option>
+    <option value="non-shanghai">非上海户籍</option>
+  </select><br>
+
+  <label>家庭结构：</label>
+  <select id="familyType">
+    <option value="family">已婚/家庭</option>
+    <option value="single">单身（含未婚、离异、丧偶）</option>
+  </select><br>
+
+  <label>是否多子女家庭：</label>
+  <select id="multiChild">
+    <option value="no">否</option>
+    <option value="yes">是（二孩及以上）</option>
+  </select><br>
+
+  <label>当前名下住房套数：</label>
+  <select id="ownedHouses">
+    <option value="0">0套（首套）</option>
+    <option value="1">1套（二套）</option>
+    <option value="2+">2套及以上</option>
+  </select><br>
+
+  <label>非沪籍：社保/个税缴纳年限（年）：</label>
+  <input type="number" id="socialYears" value="3" min="0" step="0.5">
+</div>
+
+<div class="section">
+  <h2>2. 目标房产信息</h2>
+  <label>房屋总价（元）：</label><input type="number" id="housePrice" value="6000000"><br>
+  <label>建筑面积（㎡）：</label><input type="number" id="area" value="100" step="0.1"><br>
+  <label>所在区域：</label>
+  <select id="ring">
+    <option value="inner">内环内</option>
+    <option value="middle">中外环间</option>
+    <option value="outer">外环外</option>
+  </select><br>
+  <label>是否新房（影响公积金“又提又贷”）：</label>
+  <select id="isNew">
+    <option value="yes">是（新建商品房）</option>
+    <option value="no">否（二手房）</option>
+  </select>
+</div>
+
+<div class="section">
+  <h2>3. 你的资金情况</h2>
+  <label>现金存款（元）：</label><input type="number" id="cash" value="200000"><br>
+  <label>股票市值（元）：</label><input type="number" id="stock" value="300000"><br>
+  <label>股票年化收益（%）：</label><input type="number" id="stockReturn" value="5" step="0.1"><br>
+  <label>公积金账户余额（元）：</label><input type="number" id="gjjBalance" value="100000"><br>
+  <label>月缴存公积金总额（元）：</label><input type="number" id="gjjMonthly" value="3000">
+</div>
+
+<div class="section">
+  <h2>4. 租房假设 & 分析年限</h2>
+  <label>当前月租金（元）：</label><input type="number" id="rent" value="8000"><br>
+  <label>租金年涨幅（%）：</label><input type="number" id="rentGrowth" value="3" step="0.1"><br>
+  <label>分析年限（年）：</label><input type="number" id="years" value="10" min="1" max="30">
+</div>
+
+<button onclick="runAnalysis()">🔍 智能分析（自动适配上海最新政策）</button>
+
+<div id="policyAlert" style="display:none;" class="alert"></div>
+<div id="result" class="result" style="display:none;"></div>
+
+<script>
+function runAnalysis() {
+  // ===== 1. 获取用户输入 =====
+  const hukou = document.getElementById('hukou').value;
+  const familyType = document.getElementById('familyType').value;
+  const multiChild = document.getElementById('multiChild').value === 'yes';
+  const ownedHouses = parseInt(document.getElementById('ownedHouses').value);
+  const socialYears = parseFloat(document.getElementById('socialYears').value) || 0;
+  const housePrice = parseFloat(document.getElementById('housePrice').value) || 0;
+  const area = parseFloat(document.getElementById('area').value) || 0;
+  const ring = document.getElementById('ring').value;
+  const isNew = document.getElementById('isNew').value === 'yes';
+  const cash = parseFloat(document.getElementById('cash').value) || 0;
+  const stock = parseFloat(document.getElementById('stock').value) || 0;
+  const stockReturn = parseFloat(document.getElementById('stockReturn').value) / 100;
+  const gjjBalance = parseFloat(document.getElementById('gjjBalance').value) || 0;
+  const gjjMonthly = parseFloat(document.getElementById('gjjMonthly').value) || 0;
+  const rent = parseFloat(document.getElementById('rent').value) || 0;
+  const rentGrowth = parseFloat(document.getElementById('rentGrowth').value) / 100;
+  const years = parseInt(document.getElementById('years').value) || 10;
+
+  // ===== 2. 判断是否普通住宅 =====
+  let priceLimit = 0;
+  if (ring === 'inner') priceLimit = 7800000;
+  else if (ring === 'middle') priceLimit = 6600000;
+  else priceLimit = 4800000;
+
+  const isOrdinary = (housePrice <= priceLimit) && (area <= 140);
+
+  // ===== 3. 购房资格校验 =====
+  let qualified = true;
+  let disqualifyReason = '';
+
+  if (hukou === 'non-shanghai') {
+    if (ring !== 'outer') {
+      if (socialYears < 3) {
+        qualified = false;
+        disqualifyReason = '非沪籍购买内环或中外环房产需连续缴纳社保满3年。';
+      }
+    } else {
+      if (socialYears < 1) {
+        qualified = false;
+        disqualifyReason = '非沪籍购买外环外房产需社保满1年。';
+      }
+    }
+  }
+
+  // 单身限购（内环/中外环）
+  if (familyType === 'single' && ring !== 'outer' && hukou === 'shanghai') {
+    if (ownedHouses >= 1) {
+      qualified = false;
+      disqualifyReason = '沪籍单身在内环/中外环限购1套，您已有住房。';
+    }
+  }
+
+  // 显示资格状态
+  const alertDiv = document.getElementById('policyAlert');
+  if (!qualified) {
+    alertDiv.className = 'alert error';
+    alertDiv.innerText = '❌ 购房资格不符：' + disqualifyReason;
+    alertDiv.style.display = 'block';
+    document.getElementById('result').style.display = 'none';
+    return;
+  } else {
+    alertDiv.className = 'alert success';
+    alertDiv.innerText = '✅ 符合上海购房资格！';
+    alertDiv.style.display = 'block';
+  }
+
+  // ===== 4. 首付比例 =====
+  let downPaymentRate = 0.35; // 默认
+  const isFirstHome = ownedHouses === 0;
+
+  if (isFirstHome) {
+    downPaymentRate = isOrdinary ? 0.20 : 0.35;
+  } else if (ownedHouses === 1) {
+    downPaymentRate = isOrdinary ? 0.35 : 0.70;
+  } else {
+    downPaymentRate = 0.70; // 三套及以上基本停贷
+  }
+
+  // ===== 5. 公积金贷款额度 =====
+  let gjjMax = 1400000; // 家庭默认
+  if (familyType === 'single') gjjMax = 700000;
+  if (multiChild) gjjMax = 2160000;
+
+  // 可贷额度受余额限制：余额 × 40（上海倍数）
+  const gjjLoanByBalance = gjjBalance * 40;
+  let actualGjjLoan = Math.min(gjjMax, gjjLoanByBalance, housePrice * (1 - downPaymentRate));
+
+  // 若外环外新房，可“又提又贷”，但不影响贷款额，仅影响首付来源
+
+  // ===== 6. 商业贷款 =====
+  const totalLoanNeeded = housePrice * (1 - downPaymentRate);
+  const commercialLoan = Math.max(0, totalLoanNeeded - actualGjjLoan);
+
+  // 利率（2026年商贷首套二套统一，但公积金区分）
+  const commercialRate = 0.035; // 假设3.5%
+  const gjjRate = isFirstHome ? 0.0285 : 0.03325;
+
+  // ===== 7. 月供计算 =====
+  function calcMonthlyPayment(principal, annualRate, years) {
+    if (principal <= 0) return 0;
+    const r = annualRate / 12;
+    const n = years * 12;
+    return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  }
+
+  const gjjMonthlyPayment = calcMonthlyPayment(actualGjjLoan, gjjRate, 30);
+  const commercialMonthlyPayment = calcMonthlyPayment(commercialLoan, commercialRate, 30);
+  const totalMonthlyPayment = gjjMonthlyPayment + commercialMonthlyPayment;
+
+  // ===== 8. 税费 =====
+  // 契税
+  let deedTaxRate = 0.03; // 默认三套
+  if (isFirstHome) {
+    deedTaxRate = area <= 90 ? 0.01 : 0.015;
+  } else if (ownedHouses === 1) {
+    deedTaxRate = area <= 90 ? 0.01 : 0.02;
+  }
+  const deedTax = housePrice * deedTaxRate;
+
+  // 中介费（假设2%）
+  const agentFee = housePrice * 0.02;
+  // 维修基金（假设100元/㎡）
+  const maintenanceFund = area * 100;
+  // 装修（估算）
+  const renovation = housePrice * 0.05; // 5%
+
+  const oneTimeCost = housePrice * downPaymentRate + deedTax + agentFee + maintenanceFund + renovation;
+
+  // ===== 9. 年持有成本 =====
+  const propertyFee = 5; // 元/㎡/月
+  const annualProperty = propertyFee * area * 12;
+
+  // 房产税（简化：若不符合免税条件则估算）
+  let annualPropertyTax = 0;
+  // 此处简化：假设首套均免税（因非沪籍满3年或沪籍）
+  // 如需精确，可扩展人均面积逻辑
+
+  const annualHousingCost = totalMonthlyPayment * 12 + annualProperty + annualPropertyTax;
+
+  // ===== 10. 购房总成本（含机会成本）=====
+  const housingCashOut = oneTimeCost + annualHousingCost * years;
+  const investable = cash + stock + gjjBalance;
+  const usedInOneTime = Math.min(investable, oneTimeCost);
+  const opportunityCost = usedInOneTime * (Math.pow(1 + stockReturn, years) - 1);
+  const buyTotal = housingCashOut + opportunityCost;
+
+  // ===== 11. 租房总成本 =====
+  let rentTotal = 0;
+  let r = rent;
+  for (let i = 0; i < years; i++) {
+    rentTotal += r * 12;
+    r *= (1 + rentGrowth);
+  }
+
+  // ===== 12. 输出结果 =====
+  const diff = buyTotal - rentTotal;
+  const recommendation = diff > 0 ? '租房更省' : '购房更省';
+
+  let resultHTML = `
+    <h3>📊 分析结果（${years}年周期）</h3>
+    <p>📍 房屋类型：${isOrdinary ? '普通住宅' : '非普通住宅'} · ${ring === 'inner' ? '内环内' : ring === 'middle' ? '中外环' : '外环外'}</p>
+    <p>💰 <strong>购房总成本（含机会成本）：</strong><span class="highlight">${Math.round(buyTotal).toLocaleString()}</span> 元</p>
+    <p>🏠 <strong>租房总支出：</strong><span class="highlight">${Math.round(rentTotal).toLocaleString()}</span> 元</p>
+    <p>⚖️ <strong>差额：</strong>${Math.round(diff).toLocaleString()} 元（${recommendation}）</p>
+    
+    <details><summary>📝 贷款与税费明细</summary>
+      <ul>
+        <li>首付比例：${(downPaymentRate * 100).toFixed(0)}% → ${Math.round(housePrice * downPaymentRate).toLocaleString()} 元</li>
+        <li>公积金贷款：${Math.round(actualGjjLoan).toLocaleString()} 元（利率 ${(gjjRate * 100).toFixed(2)}%）</li>
+        <li>商业贷款：${Math.round(commercialLoan).toLocaleString()} 元（利率 ${(commercialRate * 100).toFixed(2)}%）</li>
+        <li>月供合计：${Math.round(totalMonthlyPayment).toLocaleString()} 元/月</li>
+        <li>契税：${Math.round(deedTax).toLocaleString()} 元（税率 ${(deedTaxRate * 100).toFixed(1)}%）</li>
+        <li>中介费：${Math.round(agentFee).toLocaleString()} 元</li>
+        <li>装修（估算）：${Math.round(renovation).toLocaleString()} 元</li>
+        <li>物业费（${years}年）：${Math.round(annualProperty * years).toLocaleString()} 元</li>
+      </ul>
+    </details>
+  `;
+
+  document.getElementById('result').innerHTML = resultHTML;
+  document.getElementById('result').style.display = 'block';
+}
+</script>
+
+</body>
+</html>
