@@ -7,7 +7,7 @@ import React from 'react'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '买房 vs 租房决策系统 · 163参数专业模型',
+  title: '买房与租房决策系统 · 163参数专业模型',
   description: '面向上海与北京的买房租房对比与净资产决策工具。',
 }
 

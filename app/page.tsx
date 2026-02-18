@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createForm } from "@formily/core";
 import { FormProvider } from "@formily/react";
 import { FormLayout, FormStep, FormButtonGroup, Submit, Reset } from "@formily/antd-v5";
@@ -23,7 +24,7 @@ import {
   Typography,
 } from "antd";
 import { SchemaField } from "./components/FieldMappings";
-import { buildFormilySchema, createFieldMetaMap, STAGE2_CARD_LAYOUT } from "../lib/schema";
+import { buildFormilySchema, createFieldMetaMap, POLICY_LOCKED_KEYS, STAGE2_CARD_LAYOUT } from "../lib/schema";
 import { calculateModel, type ModelOutput } from "../lib/calc";
 import { deriveEffectivePolicy } from "../lib/policyProfiles";
 import {
@@ -73,6 +74,19 @@ type QuickInputs = {
   Cash_runway_months: number;
 };
 
+type DebugImpactRow = {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+  deltaNavDiff: number;
+  deltaBuyTotal: number;
+  deltaRentTotal: number;
+  locked: boolean;
+};
+
+const policyLockedKeySet = new Set(POLICY_LOCKED_KEYS);
+
 const fmtWan = (v: number) => `${(v / 10000).toFixed(1)} 万元`;
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
 const fmtWanWithYuan = (v: number) => `${(v / 10000).toFixed(1)} 万元（${Math.round(v).toLocaleString()} 元）`;
@@ -88,6 +102,22 @@ const isModelOutputLike = (value: unknown): value is ModelOutput => {
     typeof row.recommendation === "string" &&
     typeof row.isQualified === "boolean"
   );
+};
+const buildPolicyLockedInputs = (inputs: QuickInputs) => {
+  const policy = deriveEffectivePolicy(inputs);
+  const isSmallArea = (inputs.area ?? 90) <= 140;
+  const holdingYears = inputs.holding_years ?? 2;
+  return {
+    LPR: policy.lprPct,
+    BP: policy.bpBps,
+    r_gjj: inputs.is_second_home ? policy.gjjRateSecondPct : policy.gjjRateFirstPct,
+    Deed1_rate: isSmallArea ? policy.deedRateSmallFirstPct : policy.deedRateLargeFirstPct,
+    Deed2_rate: isSmallArea ? policy.deedRateSmallSecondPct : policy.deedRateLargeSecondPct,
+    VAT_rate: holdingYears >= policy.vatExemptHoldingYears ? 0 : policy.vatNonExemptPct,
+    GJJ_max_single: policy.gjjMaxSingleWan,
+    GJJ_max_family: policy.gjjMaxFamilyWan,
+    GJJ_max_multichild: policy.gjjMaxMultiChildWan,
+  };
 };
 
 export default function CalculatorPage() {
@@ -106,6 +136,10 @@ export default function CalculatorPage() {
   const [presetName, setPresetName] = useState("");
   const [presets, setPresets] = useState<PresetRow[]>([]);
   const [presetBusy, setPresetBusy] = useState(false);
+  const [lastInputSnapshot, setLastInputSnapshot] = useState<Record<string, unknown> | null>(null);
+  const [debugRows, setDebugRows] = useState<DebugImpactRow[]>([]);
+  const [debugRunning, setDebugRunning] = useState(false);
+  const [debugProgress, setDebugProgress] = useState(0);
   const [quickInputs, setQuickInputs] = useState<QuickInputs>({
     target_city: "上海",
     is_second_home: 0,
@@ -192,21 +226,27 @@ export default function CalculatorPage() {
     []
   );
 
+  const lockedPolicyInputs = useMemo(() => buildPolicyLockedInputs(quickInputs), [quickInputs]);
   const runAnalysis = useCallback(
-    (overrides: Record<string, any> = {}) => {
+    (overrides: Record<string, any> = {}, expertConfigured = false) => {
       const merged = {
-        ...form.values,
         ...quickInputs,
+        ...(expertConfigured ? form.values : {}),
         ...overrides,
+        ...lockedPolicyInputs,
+        expert_configured: expertConfigured,
       };
       form.setValues(merged);
+      setLastInputSnapshot(merged as Record<string, unknown>);
+      setDebugRows([]);
+      setDebugProgress(0);
       const computed = calculateModel(merged);
       setResult(computed);
       if (isLoggedIn) {
         void upsertRun(merged as Record<string, unknown>, computed as unknown as Record<string, unknown>);
       }
     },
-    [form, quickInputs, isLoggedIn]
+    [form, quickInputs, isLoggedIn, lockedPolicyInputs]
   );
   const refreshPresets = useCallback(async () => {
     const rows = await listPresets();
@@ -223,15 +263,111 @@ export default function CalculatorPage() {
         setResult(savedResult);
         setStage2Completed(true);
         setStage(4);
+        setLastInputSnapshot({
+          ...merged,
+          ...lockedPolicyInputs,
+          expert_configured: !!(savedInput as Record<string, unknown>).expert_configured,
+        });
       } else {
-        runAnalysis(merged as Record<string, unknown>);
+        runAnalysis(
+          merged as Record<string, unknown>,
+          !!(savedInput as Record<string, unknown>).expert_configured
+        );
       }
       setAuthMessage(`已加载场景：${preset.name}`);
     },
-    [form, quickInputs, runAnalysis]
+    [form, quickInputs, runAnalysis, lockedPolicyInputs]
   );
 
   const teaserPolicy = useMemo(() => deriveEffectivePolicy(quickInputs), [quickInputs]);
+  const schemaItems = useMemo(
+    () =>
+      (rawSchema.groups ?? []).flatMap((group: any) =>
+        (group.items ?? []).map((item: any) => ({
+          key: String(item.key),
+          label: String(item.label ?? item.key),
+          type: String(item.type ?? "string"),
+          enum: Array.isArray(item.enum) ? item.enum : undefined,
+          default: item.default,
+        }))
+      ),
+    []
+  );
+
+  useEffect(() => {
+    if (!result || !lastInputSnapshot || debugRunning) return;
+    let cancelled = false;
+    const toNum = (v: unknown): number | undefined => {
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (typeof v === "string") {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    };
+    const pickStep = (value: number) => {
+      const abs = Math.abs(value);
+      if (abs >= 10000) return Math.max(100, abs * 0.01);
+      if (abs >= 100) return Math.max(1, abs * 0.01);
+      if (abs >= 1) return 0.1;
+      return 0.01;
+    };
+    const runDebug = async () => {
+      setDebugRunning(true);
+      const baseResult = result;
+      const total = schemaItems.length;
+      const rows: DebugImpactRow[] = [];
+      for (let i = 0; i < schemaItems.length; i++) {
+        if (cancelled) return;
+        const item = schemaItems[i];
+        const currentRaw = (lastInputSnapshot as Record<string, unknown>)[item.key] ?? item.default;
+        let nextValue: unknown = undefined;
+        if (item.type === "number") {
+          const num = toNum(currentRaw);
+          if (num !== undefined) nextValue = num + pickStep(num);
+        } else if (item.type === "string" && item.enum && item.enum.length > 1) {
+          const idx = item.enum.findIndex((v: unknown) => v === currentRaw);
+          nextValue = item.enum[(idx >= 0 ? idx + 1 : 0) % item.enum.length];
+        } else if (item.type === "boolean") {
+          nextValue = !Boolean(currentRaw);
+        }
+        if (nextValue !== undefined) {
+          const testInput = {
+            ...lastInputSnapshot,
+            [item.key]: nextValue,
+            __debug_fast: true,
+          };
+          const out = calculateModel(testInput);
+          const baseNav = baseResult.wealthView?.navDiff ?? 0;
+          const outNav = out.wealthView?.navDiff ?? 0;
+          rows.push({
+            key: item.key,
+            label: item.label,
+            before: String(currentRaw ?? ""),
+            after: String(nextValue),
+            deltaNavDiff: outNav - baseNav,
+            deltaBuyTotal: out.buyTotal - baseResult.buyTotal,
+            deltaRentTotal: out.rentTotal - baseResult.rentTotal,
+            locked: policyLockedKeySet.has(item.key),
+          });
+        }
+        if ((i + 1) % 10 === 0 || i + 1 === total) {
+          setDebugProgress(Math.round(((i + 1) / total) * 100));
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      if (!cancelled) {
+        rows.sort((a, b) => Math.abs(b.deltaNavDiff) - Math.abs(a.deltaNavDiff));
+        setDebugRows(rows);
+        setDebugRunning(false);
+      }
+    };
+    void runDebug();
+    return () => {
+      cancelled = true;
+      setDebugRunning(false);
+    };
+  }, [result, lastInputSnapshot, schemaItems, debugRunning]);
 
   const modelResolution = useMemo(() => {
     const required: Array<keyof QuickInputs> = [
@@ -257,7 +393,7 @@ export default function CalculatorPage() {
   const onExpertSubmit = useCallback(async () => {
     try {
       const values = (await form.submit()) as Record<string, any>;
-      runAnalysis(values);
+      runAnalysis(values, true);
     } catch {}
   }, [form, runAnalysis]);
 
@@ -265,6 +401,7 @@ export default function CalculatorPage() {
     const meta = fieldMetaMap[key as string];
     const label = meta?.label ?? key;
     const unit = meta?.unit;
+    const lockedValue = (lockedPolicyInputs as Record<string, unknown>)[key as string];
 
     if (key === "Repay_type") {
       return (
@@ -316,13 +453,21 @@ export default function CalculatorPage() {
         </>
       );
     }
+    if (policyLockedKeySet.has(key as string) && typeof lockedValue === "number") {
+      return (
+        <>
+          <Text>{unit ? `${label}（自动应用）` : `${label}（自动应用）`}</Text>
+          <InputNumber style={{ width: "100%" }} value={lockedValue} disabled />
+        </>
+      );
+    }
     return (
       <>
         <Text>{unit ? `${label}（${unit}）` : label}</Text>
         <InputNumber style={{ width: "100%" }} value={quickInputs[key] as number} onChange={(v) => updateQuickInput(key as any, v)} />
       </>
     );
-  }, [fieldMetaMap, quickInputs, updateQuickInput]);
+  }, [fieldMetaMap, quickInputs, updateQuickInput, lockedPolicyInputs]);
 
   const dashboard = useMemo(() => {
     if (!result) return null;
@@ -400,7 +545,16 @@ export default function CalculatorPage() {
   return (
     <div style={{ padding: 20, maxWidth: 1400, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <Title level={2} style={{ marginBottom: 6 }}>买房 vs 租房 专业结果解读</Title>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={2} style={{ marginBottom: 6 }}>买房与租房专业结果解读</Title>
+          </Col>
+          <Col>
+            <Link href="/debug">
+              <Button>进入调试页面</Button>
+            </Link>
+          </Col>
+        </Row>
         <Paragraph type="secondary" style={{ marginBottom: 0 }}>
           四段式建模流程：悬念预告 -&gt; 基础建模 -&gt; 核心精算 -&gt; 高级模式。
         </Paragraph>
@@ -432,8 +586,8 @@ export default function CalculatorPage() {
                   <Alert
                     type="warning"
                     showIcon
-                    message="Supabase 未配置"
-                    description="请设置 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY。"
+                    message="云端保存未启用"
+                    description="当前使用本地模式，你仍可正常测算。"
                   />
                 )}
                 {sessionReady && !isLoggedIn && hasSupabase && (
@@ -668,7 +822,7 @@ export default function CalculatorPage() {
                     <Col span={12}><Text>搬家费（元）</Text><InputNumber style={{ width: "100%" }} value={quickInputs.Move_cost} onChange={(v) => updateQuickInput("Move_cost", v)} /></Col>
                   </Row>
                   <Button type="primary" block onClick={() => { runAnalysis(); setStage(4); }}>
-                    更新4K精算报告
+                    更新精算报告
                   </Button>
                 </Space>
               </Card>
@@ -744,6 +898,49 @@ export default function CalculatorPage() {
                   <br />
                   <Text type="secondary">租房总成本：{fmtWanWithYuan(result.rentTotal)}</Text>
                 </div>
+              </Card>
+
+              <Card title="调试模式：参数影响分解（全量）" size="small">
+                <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                  <Text type="secondary">
+                    口径：逐个参数做微小扰动并重算，显示对净资产差额（买房-租房）的边际影响。
+                  </Text>
+                  {debugRunning ? (
+                    <Progress percent={debugProgress} status="active" />
+                  ) : (
+                    <Text type="secondary">已完成，共 {debugRows.length} 个参数影响项。</Text>
+                  )}
+                  <div style={{ overflowX: "auto", maxHeight: 360 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>参数</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>原值</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>扰动值</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>净资产差额变化（元）</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>买房总成本变化（元）</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>租房总成本变化（元）</th>
+                          <th style={{ padding: 6, borderBottom: "1px solid #f0f0f0" }}>类型</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugRows.map((row) => (
+                          <tr key={row.key}>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.label}（{row.key}）</td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.before}</td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.after}</td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa", color: row.deltaNavDiff >= 0 ? "#389e0d" : "#cf1322" }}>
+                              {row.deltaNavDiff.toLocaleString()}
+                            </td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.deltaBuyTotal.toLocaleString()}</td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.deltaRentTotal.toLocaleString()}</td>
+                            <td style={{ padding: 6, borderBottom: "1px solid #fafafa" }}>{row.locked ? "政策自动项" : "可调项"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Space>
               </Card>
 
               <Card title="现金流曲线（年化）" size="small">
@@ -857,11 +1054,11 @@ export default function CalculatorPage() {
               <Card title="现金流安全" size="small">
                 <Row gutter={16}>
                   <Col xs={24} md={8}>
-                    <Progress type="dashboard" percent={Math.min(100, Math.round(result.report.stressTest.incomeDrop20.monthlyCoverageRatio * 50))} format={() => `${result.report.stressTest.incomeDrop20.monthlyCoverageRatio.toFixed(2)}x`} />
+                    <Progress type="dashboard" percent={Math.min(100, Math.round(result.report.stressTest.incomeDrop20.monthlyCoverageRatio * 50))} format={() => `${result.report.stressTest.incomeDrop20.monthlyCoverageRatio.toFixed(2)} 倍`} />
                     <Text type="secondary">收入-20%覆盖率</Text>
                   </Col>
                   <Col xs={24} md={8}>
-                    <Progress type="dashboard" percent={Math.min(100, Math.round(result.report.stressTest.incomeDrop40.monthlyCoverageRatio * 50))} format={() => `${result.report.stressTest.incomeDrop40.monthlyCoverageRatio.toFixed(2)}x`} strokeColor={result.report.stressTest.incomeDrop40.safe ? "#52c41a" : "#ff4d4f"} />
+                    <Progress type="dashboard" percent={Math.min(100, Math.round(result.report.stressTest.incomeDrop40.monthlyCoverageRatio * 50))} format={() => `${result.report.stressTest.incomeDrop40.monthlyCoverageRatio.toFixed(2)} 倍`} strokeColor={result.report.stressTest.incomeDrop40.safe ? "#52c41a" : "#ff4d4f"} />
                     <Text type="secondary">收入-40%覆盖率</Text>
                   </Col>
                   <Col xs={24} md={8}>

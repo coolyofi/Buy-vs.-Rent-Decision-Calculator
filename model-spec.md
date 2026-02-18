@@ -19,6 +19,11 @@
 - `wealthView.rentNAV`：租房期末净资产（元）
 - `wealthView.navDiff`：净资产差额（元，买房 - 租房）
 
+## 2.1 专家参数启用规则
+- 默认计算不纳入专家扩展项（如隐藏摩擦成本、附加中介、押金机会成本等）。
+- 仅当用户在“高级模式”提交后，`expert_configured=true`，才启用专家扩展项。
+- 目的：避免用户未配置高级参数时出现“来源不明的大额成本”。
+
 ## 3. 交互流程（页面）
 - 阶段一：悬念预告（城市/套数/总价/面积）
 - 阶段二：基础建模（约 20 项核心参数）
@@ -38,6 +43,8 @@
 - 增值税免征年限
 - 公积金额度上限（单人/家庭/多子女）
 
+这些政策参数在前端按“自动应用”展示，不允许手工修改。
+
 ## 5. 核心计算链路
 
 ### 5.1 贷款结构与成本
@@ -51,7 +58,15 @@
 - 买租两侧流动资金按 `R_inv/12` 复利
 - 租金按 `g_r` 年化增长
 - 月度现金流差额按 `Invest_consistency` 进入投资池
+  - 输入兼容 `0~1` 与 `0~100` 两种格式（`70` 会按 `70%` 处理）
 - 每 12 个月输出年度净资产截面
+
+当前已纳入的关键字段（含近期补齐）：
+- 还款方式：`Repay_type`（等额本息/等额本金）
+- 个税抵扣：`Deduct_limit`
+- 现金安全阈值：`Cash_runway_months`
+- 高级模式持有成本：`PM_growth`、`Maintenance_yearly`、`PropertyTax_rate`、`Insurance`、`Parking_mgmt`、`Broadband`、`Energy_premium`、`Large_replace`
+- 高级模式租房扩展：`Rent_tax_rate`、`Residence_fee`、`GJJ_rent_cap`、`Commute_delta`、`CPI`
 
 ### 5.3 年度净资产
 - 买房净资产 = 房屋市值 - 剩余贷款 - 卖出成本 + 买方流动资产
@@ -94,9 +109,9 @@
 
 ## 8. 场景输出
 `report.netWorthComparison.scenarios` 包含三情景：
-- Bear（偏弱）
-- Base（基准）
-- Bull（偏强）
+- 偏弱情景（Bear）
+- 基准情景（Base）
+- 偏强情景（Bull）
 
 三者均基于同一时序函数重算，不走独立估算公式。
 
@@ -111,3 +126,11 @@
 - 表单分层与字段映射：`lib/schema.ts`
 - 政策注入：`lib/policyProfiles.ts`
 - 登录与持久化：`lib/supabaseClient.ts`
+
+## 11. 调试模式（参数影响分解）
+- 页面结果区内置“参数影响分解（全量）”调试表。
+- 计算方法：对每个参数做一次微小扰动，重跑模型并记录差值：
+  - `净资产差额变化（deltaNavDiff）`
+  - `买房总成本变化（deltaBuyTotal）`
+  - `租房总成本变化（deltaRentTotal）`
+- 调试重算使用 `__debug_fast=true` 口径，避免重复执行完整敏感性矩阵，保障页面可用性。

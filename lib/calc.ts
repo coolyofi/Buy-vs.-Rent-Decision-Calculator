@@ -185,17 +185,40 @@ const yearlyRentCostWan = (rent0Yuan: number, growth: number, years: number): nu
 };
 
 const pmtWan = (principalWan: number, annualRate: number, termMonths: number): number => {
-  if (principalWan <= 0 || annualRate <= 0 || termMonths <= 0) return 0;
+  if (principalWan <= 0 || termMonths <= 0) return 0;
+  if (annualRate === 0) return principalWan / termMonths;
+  if (annualRate < 0) return 0;
   const m = annualRate / 12;
   const pow = Math.pow(1 + m, termMonths);
   return (principalWan * m * pow) / (pow - 1);
+};
+
+type RepayType = "等额本息" | "等额本金";
+
+const paymentAtMonthWan = (
+  principalWan: number,
+  annualRate: number,
+  termMonths: number,
+  month: number,
+  repayType: RepayType
+): number => {
+  if (principalWan <= 0 || termMonths <= 0 || month <= 0) return 0;
+  if (month > termMonths) return 0;
+  if (repayType === "等额本金") {
+    const principalPart = principalWan / termMonths;
+    const remaining = Math.max(0, principalWan - principalPart * (month - 1));
+    const interestPart = annualRate <= 0 ? 0 : remaining * (annualRate / 12);
+    return principalPart + interestPart;
+  }
+  return pmtWan(principalWan, annualRate, termMonths);
 };
 
 const amortization = (
   principalWan: number,
   annualRate: number,
   termMonths: number,
-  horizonMonths: number
+  horizonMonths: number,
+  repayType: RepayType = "等额本息"
 ): { principalPaidWan: number; interestPaidWan: number; remainingWan: number } => {
   if (principalWan <= 0 || horizonMonths <= 0) {
     return { principalPaidWan: 0, interestPaidWan: 0, remainingWan: Math.max(0, principalWan) };
@@ -207,8 +230,9 @@ const amortization = (
   let interestPaid = 0;
   const months = Math.min(horizonMonths, termMonths);
   for (let i = 0; i < months; i++) {
-    const interest = remaining * m;
-    const principal = Math.min(remaining, payment - interest);
+    const interest = annualRate <= 0 ? 0 : remaining * m;
+    const paymentCurrent = repayType === "等额本金" ? paymentAtMonthWan(principalWan, annualRate, termMonths, i + 1, repayType) : payment;
+    const principal = Math.min(remaining, paymentCurrent - interest);
     remaining -= principal;
     principalPaid += principal;
     interestPaid += interest;
@@ -218,6 +242,8 @@ const amortization = (
 
 export function calculateModel(input: ModelInput = {}): ModelOutput {
   const policy = deriveEffectivePolicy(input);
+  const expertConfigured = toBool(input.expert_configured, false);
+  const debugFast = toBool(input.__debug_fast, false);
   const isSecondHome = toBool(input.is_second_home, false);
   const hasMultiChild = toBool(input.multi_child_bonus, false);
   const P = toWanAmount(input.P, 600);
@@ -242,8 +268,8 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   const eduRate = toPercentDecimal(input.Edu_rate, 3);
   const localEduRate = toPercentDecimal(input.LocalEdu_rate, 2);
   const pitGrossRate = toPercentDecimal(input.PIT_gross_rate, 1.5);
-  const buyerAgentRate = toPercentDecimal(input.Buyer_agent_rate, 1.5);
-  const sellerToBuyerRate = toPercentDecimal(input.Seller_to_buyer_rate, 0.5);
+  const buyerAgentRate = expertConfigured ? toPercentDecimal(input.Buyer_agent_rate, 1.5) : 0;
+  const sellerToBuyerRate = expertConfigured ? toPercentDecimal(input.Seller_to_buyer_rate, 0.5) : 0;
   const m5u = toBool(input.M5U, true);
 
   const renoHard = toWanAmount(input.Reno_hard, 30);
@@ -287,18 +313,43 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   const taxesAndFeesWan =
     deedTaxWan + vatWan + vatAddonWan + pitWan + P * (buyerAgentRate + sellerToBuyerRate) + regFee + loanService;
   const renovationWan = renoHard + renoSoft;
-  const frictionCostWan = toWanAmount(input.Move_cost, 0.3) + toWanAmount(input.Time_cost, 0.1);
+  // Move_cost is in yuan; Time_cost is in wan-yuan.
+  const frictionCostWan =
+    (Math.max(0, toNumber(input.Move_cost) ?? 3000) / 10000) +
+    (expertConfigured ? toWanAmount(input.Time_cost, 0.1) : 0);
   const oneTimeCostWan = downPaymentWan + taxesAndFeesWan + renovationWan + frictionCostWan;
 
   const termMonths = Math.max(12, (Math.trunc(toNumber(input.n_years) ?? 30) * 12));
-  const monthlyPaymentWan = pmtWan(L_gjj, rGjj, termMonths) + pmtWan(L_com, lpr, termMonths);
+  const repayType: RepayType = input.Repay_type === "等额本金" ? "等额本金" : "等额本息";
+  const monthlyPaymentWan =
+    paymentAtMonthWan(L_gjj, rGjj, termMonths, 1, repayType) +
+    paymentAtMonthWan(L_com, lpr, termMonths, 1, repayType);
   const monthlyPaymentYuan = monthlyPaymentWan * 10000;
 
   const pmUnit = toNumber(input.PM_unit) ?? 5;
   const monthlyHoldingYuan = pmUnit * area;
-  const monthlyCashOutYuan = Math.max(0, monthlyPaymentYuan + monthlyHoldingYuan - gjjOffsetYuan);
+  const deductLimitYuan = Math.max(0, toNumber(input.Deduct_limit) ?? 1000);
+  const mortgageTaxSavingYuan = deductLimitYuan * 0.1;
+  const monthlyCashOutYuan = Math.max(0, monthlyPaymentYuan + monthlyHoldingYuan - gjjOffsetYuan - mortgageTaxSavingYuan);
+  const pmGrowth = expertConfigured ? toPercentDecimal(input.PM_growth, 3) : 0;
+  const propertyTaxRate = expertConfigured ? toPercentDecimal(input.PropertyTax_rate, 0.4) : 0;
+  const maintenanceYearly = expertConfigured ? Math.max(0, toNumber(input.Maintenance_yearly) ?? 30) : 0;
+  const insuranceYearly = expertConfigured ? Math.max(0, toNumber(input.Insurance) ?? 800) : 0;
+  const parkingMgmtMonthly = expertConfigured ? Math.max(0, toNumber(input.Parking_mgmt) ?? 0) : 0;
+  const broadbandMonthly = expertConfigured ? Math.max(0, toNumber(input.Broadband) ?? 120) : 0;
+  const energyMonthly = expertConfigured ? Math.max(0, toNumber(input.Energy_premium) ?? 0) : 0;
+  const largeReplaceWan = expertConfigured && years >= 10 ? toWanAmount(input.Large_replace, 2) : 0;
+  const baseAnnualHoldingYuan =
+    area * maintenanceYearly +
+    insuranceYearly +
+    (parkingMgmtMonthly + broadbandMonthly + energyMonthly) * 12 +
+    P * 10000 * propertyTaxRate;
+  let holdingExtraTotalWan = 0;
+  for (let y = 0; y < years; y++) {
+    holdingExtraTotalWan += (baseAnnualHoldingYuan * Math.pow(1 + pmGrowth, y)) / 10000;
+  }
   const yearlyOutflowWan = (monthlyCashOutYuan * 12) / 10000;
-  const buyCashOutWan = oneTimeCostWan + yearlyOutflowWan * years;
+  const buyCashOutWan = oneTimeCostWan + yearlyOutflowWan * years + holdingExtraTotalWan + largeReplaceWan;
   const capitalLockedWan = downPaymentWan;
   const opportunityCostWan = capitalLockedWan * (Math.pow(1 + rInv, years) - 1);
   const buyTotalWan = buyCashOutWan + opportunityCostWan;
@@ -307,16 +358,24 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   const moveEveryYears = Math.max(1, toNumber(input.Move_freq_years) ?? 2);
   const moves = Math.floor(years / moveEveryYears);
   const moveCostYuan = Math.max(0, toNumber(input.Move_cost) ?? 3000);
-  const furnDeprYuan = Math.max(0, toNumber(input.Furn_depr) ?? 2000);
-  const overlapRentYuan = Math.max(0, toNumber(input.Overlap_rent) ?? 0);
-  const socialCostYuan = Math.max(0, toNumber(input.Social_cost) ?? 0);
-  const rentAgentRateMonths = Math.max(0, toNumber(input.Rent_agent_rate) ?? 0.5);
+  const furnDeprYuan = expertConfigured ? Math.max(0, toNumber(input.Furn_depr) ?? 2000) : 0;
+  const overlapRentYuan = expertConfigured ? Math.max(0, toNumber(input.Overlap_rent) ?? 0) : 0;
+  const socialCostYuan = expertConfigured ? Math.max(0, toNumber(input.Social_cost) ?? 0) : 0;
+  const rentAgentRateMonths = expertConfigured ? Math.max(0, toNumber(input.Rent_agent_rate) ?? 0.5) : 0;
   const relocationCostYuan = moves * (moveCostYuan + furnDeprYuan + overlapRentYuan + socialCostYuan);
   const rentAgentCostYuan = moves * rentAgentRateMonths * rent0;
-  const depositMult = Math.max(0, toNumber(input.Deposit_mult) ?? 1.25);
+  const depositMult = expertConfigured ? Math.max(0, toNumber(input.Deposit_mult) ?? 1.25) : 0;
   const depositOpportunityYuan = depositMult * rent0 * (Math.pow(1 + rInv, years) - 1);
   const rentFrictionWan = (relocationCostYuan + rentAgentCostYuan + depositOpportunityYuan) / 10000;
-  const rentTotalWan = rentBaseWan + rentFrictionWan;
+  const rentTaxRate = expertConfigured ? toPercentDecimal(input.Rent_tax_rate, 1) : 0;
+  const residenceFeeYuan = expertConfigured ? Math.max(0, toNumber(input.Residence_fee) ?? 0) : 0;
+  const gjjRentCapYuan = expertConfigured ? Math.max(0, toNumber(input.GJJ_rent_cap) ?? 0) : 0;
+  const commuteDeltaYuan = expertConfigured ? Math.max(0, toNumber(input.Commute_delta) ?? 0) : 0;
+  const rentTaxWan = rentBaseWan * rentTaxRate;
+  const residenceFeeWan = (residenceFeeYuan * years) / 10000;
+  const commuteWan = (commuteDeltaYuan * 12 * years) / 10000;
+  const gjjRentOffsetWan = (Math.min(gjjRentCapYuan, rent0) * 12 * years) / 10000;
+  const rentTotalWan = Math.max(0, rentBaseWan + rentFrictionWan + rentTaxWan + residenceFeeWan + commuteWan - gjjRentOffsetWan);
   const diffYuan = Math.round((buyTotalWan - rentTotalWan) * 10000);
   const recommendation = diffYuan > 0 ? "租房更省" : "购房更省";
 
@@ -335,8 +394,8 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   const emergencyRunwayMonths = ((cashWan + familySupportWan) * 10000) / monthlyBurn;
 
   const amortHorizon = Math.min(10, years) * 12;
-  const gjjAmort = amortization(L_gjj, rGjj, termMonths, amortHorizon);
-  const comAmort = amortization(L_com, lpr, termMonths, amortHorizon);
+  const gjjAmort = amortization(L_gjj, rGjj, termMonths, amortHorizon, repayType);
+  const comAmort = amortization(L_com, lpr, termMonths, amortHorizon, repayType);
   const principalPaid10y = (gjjAmort.principalPaidWan + comAmort.principalPaidWan) * 10000;
   const interestPaid10y = (gjjAmort.interestPaidWan + comAmort.interestPaidWan) * 10000;
   const remainingLoanWan = gjjAmort.remainingWan + comAmort.remainingWan;
@@ -354,7 +413,12 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
       ? monthlyDiffYuan * ((Math.pow(1 + periodicInvRate, years * 12) - 1) / periodicInvRate)
       : monthlyDiffYuan * years * 12;
   const investmentContribution = Math.round(downPaymentFVYuan + monthlyDiffFVYuan);
-  const investConsistency = clamp(toNumber(input.Invest_consistency) ?? 0.7, 0, 1);
+  const investConsistencyRaw = toNumber(input.Invest_consistency);
+  const investConsistency = clamp(
+    investConsistencyRaw === undefined ? 0.7 : (investConsistencyRaw > 1 ? investConsistencyRaw / 100 : investConsistencyRaw),
+    0,
+    1
+  );
   const gHouse = toPercentDecimal(input.g_p, 3);
   const sellerAgentRate = toPercentDecimal(input.Seller_agent_rate, 2);
   const sellerTaxRate = toPercentDecimal(input.Seller_tax_rate, 0);
@@ -368,6 +432,7 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
     { name: "Bull" as const, g: 0.04 },
   ];
 
+  const cpiRate = expertConfigured ? toPercentDecimal(input.CPI, 2) : 0;
   const runNavSeries = (houseGrowth: number, rentGrowth: number) => {
     let rentNowYuan = rent0;
     let buyLiquidYuan = 0;
@@ -379,12 +444,18 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
       rentLiquidYuan *= 1 + rInv / 12;
       if (m > 1 && (m - 1) % 12 === 0) rentNowYuan *= 1 + rentGrowth;
 
-      let rentOutflowYuan = Math.max(0, rentNowYuan - 1500 * 0.1);
+      const monthPaymentWan =
+        paymentAtMonthWan(L_gjj, rGjj, termMonths, m, repayType) +
+        paymentAtMonthWan(L_com, lpr, termMonths, m, repayType);
+      const monthBuyOutflowYuan = Math.max(0, monthPaymentWan * 10000 + monthlyHoldingYuan - gjjOffsetYuan - mortgageTaxSavingYuan);
+      let rentOutflowYuan = Math.max(0, rentNowYuan - 1500 * 0.1 - Math.min(gjjRentCapYuan, rentNowYuan) + commuteDeltaYuan);
+      rentOutflowYuan += rentNowYuan * rentTaxRate;
       if (m % Math.max(12, moveEveryYears * 12) === 0) {
-        rentOutflowYuan += moveCostYuan + rent0 * rentAgentRateMonths;
+        const moveCostInflated = moveCostYuan * Math.pow(1 + cpiRate, m / 12);
+        rentOutflowYuan += moveCostInflated + rent0 * rentAgentRateMonths;
       }
 
-      const gapYuan = monthlyCashOutYuan - rentOutflowYuan;
+      const gapYuan = monthBuyOutflowYuan - rentOutflowYuan;
       if (gapYuan > 0) {
         rentLiquidYuan += gapYuan * investConsistency;
       } else {
@@ -394,9 +465,9 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
       if (m % 12 === 0) {
         const year = m / 12;
         const houseValueYuan = P * 10000 * Math.pow(1 + houseGrowth, year);
-        const gjjRem = amortization(L_gjj, rGjj, termMonths, m).remainingWan * 10000;
-        const comRem = amortization(L_com, lpr, termMonths, m).remainingWan * 10000;
-        const sellCostYuan = houseValueYuan * exitCostRate + toWanAmount(input.Time_cost, 0.1) * 10000;
+        const gjjRem = amortization(L_gjj, rGjj, termMonths, m, repayType).remainingWan * 10000;
+        const comRem = amortization(L_com, lpr, termMonths, m, repayType).remainingWan * 10000;
+        const sellCostYuan = houseValueYuan * exitCostRate + (expertConfigured ? toWanAmount(input.Time_cost, 0.1) * 10000 : 0);
         yearly.push({
           year,
           buyNAV: Math.round(houseValueYuan - (gjjRem + comRem) - sellCostYuan + buyLiquidYuan),
@@ -429,17 +500,25 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
     rentNAV: Math.round(oneTimeCostWan * 10000),
   };
 
-  const scenarios: ScenarioComparison[] = scenarioDefs.map(({ name, g }) => {
-    const series = runNavSeries(g, gRent);
-    const final = series[series.length - 1] ?? finalBaseNAV;
-    return {
-      name,
-      houseGrowth: g,
-      buyNetWorth: final.buyNAV,
-      rentNetWorth: final.rentNAV,
-      gap: final.buyNAV - final.rentNAV,
-    };
-  });
+  const scenarios: ScenarioComparison[] = debugFast
+    ? scenarioDefs.map(({ name, g }) => ({
+        name,
+        houseGrowth: g,
+        buyNetWorth: finalBaseNAV.buyNAV,
+        rentNetWorth: finalBaseNAV.rentNAV,
+        gap: finalBaseNAV.buyNAV - finalBaseNAV.rentNAV,
+      }))
+    : scenarioDefs.map(({ name, g }) => {
+        const series = runNavSeries(g, gRent);
+        const final = series[series.length - 1] ?? finalBaseNAV;
+        return {
+          name,
+          houseGrowth: g,
+          buyNetWorth: final.buyNAV,
+          rentNetWorth: final.rentNAV,
+          gap: final.buyNAV - final.rentNAV,
+        };
+      });
 
   let crossoverYear: number | null = null;
   for (const row of yearlyBaseNAV) {
@@ -449,14 +528,15 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
     }
   }
 
-  let breakEvenGrowth = 0.08;
+  let breakEvenGrowth = debugFast ? gHouse : 0.08;
 
   const increase50bp = pmtWan(L_gjj, rGjj + 0.005, termMonths) + pmtWan(L_com, lpr + 0.005, termMonths);
   const increase100bp = pmtWan(L_gjj, rGjj + 0.01, termMonths) + pmtWan(L_com, lpr + 0.01, termMonths);
 
   const cover20 = (incomeEstimateYuan * 0.8 - fixedExpenseYuan) / Math.max(1, monthlyCashOutYuan);
   const cover40 = (incomeEstimateYuan * 0.6 - fixedExpenseYuan) / Math.max(1, monthlyCashOutYuan);
-  const unemployment6Safe = emergencyRunwayMonths >= 6;
+  const runwayNeed = Math.max(1, toNumber(input.Cash_runway_months) ?? 6);
+  const unemployment6Safe = emergencyRunwayMonths >= runwayNeed;
   const medicalShock = toNumber(input.Medical_future) ?? 0;
   const medicalShockReserveGap = Math.max(0, medicalShock - (cashWan * 10000 * 0.35));
 
@@ -514,11 +594,15 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
 
     if (m > 1 && (m - 1) % 12 === 0) currentRentYuan *= 1 + gRent;
 
-    let rentOutflowYuan = Math.max(0, currentRentYuan - rentTaxSavingYuan);
+    const monthPaymentWan =
+      paymentAtMonthWan(L_gjj, rGjj, termMonths, m, repayType) +
+      paymentAtMonthWan(L_com, lpr, termMonths, m, repayType);
+    const buyOutflowYuan = Math.max(0, monthPaymentWan * 10000 + monthlyHoldingYuan - gjjOffsetYuan - mortgageTaxSavingYuan);
+    let rentOutflowYuan = Math.max(0, currentRentYuan - rentTaxSavingYuan - Math.min(gjjRentCapYuan, currentRentYuan) + commuteDeltaYuan);
+    rentOutflowYuan += currentRentYuan * rentTaxRate;
     if (m % Math.max(12, moveEveryYears * 12) === 0) {
-      rentOutflowYuan += (moveCostYuan + rent0 * rentAgentRateMonths);
+      rentOutflowYuan += (moveCostYuan * Math.pow(1 + cpiRate, m / 12) + rent0 * rentAgentRateMonths);
     }
-    const buyOutflowYuan = monthlyCashOutYuan;
     const gapYuan = buyOutflowYuan - rentOutflowYuan;
 
     if (gapYuan > 0) {
@@ -538,8 +622,8 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   }
   const finalYearly = finalBaseNAV;
 
-  const sensitivityHouseGrowth = [-0.02, 0, 0.02, 0.04, 0.06];
-  const sensitivityRentGrowth = [0.01, 0.02, 0.03, 0.04, 0.05];
+  const sensitivityHouseGrowth = debugFast ? [gHouse] : [-0.02, 0, 0.02, 0.04, 0.06];
+  const sensitivityRentGrowth = debugFast ? [gRent] : [0.01, 0.02, 0.03, 0.04, 0.05];
   const wealthGapMatrix = sensitivityHouseGrowth.map((hg) =>
     sensitivityRentGrowth.map((rg) => {
       const series = runNavSeries(hg, rg);
@@ -547,23 +631,25 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
       return final.buyNAV - final.rentNAV;
     })
   );
-  const gapByHouseAtCurrentRent = sensitivityHouseGrowth.map((_, i) =>
-    interpolateGapByRent(wealthGapMatrix[i], sensitivityRentGrowth, gRent)
-  );
-  const firstPositiveIdx = gapByHouseAtCurrentRent.findIndex((v) => v >= 0);
-  if (firstPositiveIdx === 0) {
-    breakEvenGrowth = sensitivityHouseGrowth[0];
-  } else if (firstPositiveIdx > 0) {
-    const i = firstPositiveIdx;
-    breakEvenGrowth = interpolateY(
-      0,
-      gapByHouseAtCurrentRent[i - 1],
-      sensitivityHouseGrowth[i - 1],
-      gapByHouseAtCurrentRent[i],
-      sensitivityHouseGrowth[i]
+  if (!debugFast) {
+    const gapByHouseAtCurrentRent = sensitivityHouseGrowth.map((_, i) =>
+      interpolateGapByRent(wealthGapMatrix[i], sensitivityRentGrowth, gRent)
     );
-  } else if (gapByHouseAtCurrentRent[gapByHouseAtCurrentRent.length - 1] < 0) {
-    breakEvenGrowth = sensitivityHouseGrowth[sensitivityHouseGrowth.length - 1];
+    const firstPositiveIdx = gapByHouseAtCurrentRent.findIndex((v) => v >= 0);
+    if (firstPositiveIdx === 0) {
+      breakEvenGrowth = sensitivityHouseGrowth[0];
+    } else if (firstPositiveIdx > 0) {
+      const i = firstPositiveIdx;
+      breakEvenGrowth = interpolateY(
+        0,
+        gapByHouseAtCurrentRent[i - 1],
+        sensitivityHouseGrowth[i - 1],
+        gapByHouseAtCurrentRent[i],
+        sensitivityHouseGrowth[i]
+      );
+    } else if (gapByHouseAtCurrentRent[gapByHouseAtCurrentRent.length - 1] < 0) {
+      breakEvenGrowth = sensitivityHouseGrowth[sensitivityHouseGrowth.length - 1];
+    }
   }
   const wealthView = {
     buyNAV: finalYearly.buyNAV,

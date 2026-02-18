@@ -33,6 +33,18 @@ export const PLUS_17_KEYS = [
 
 const quickSet = new Set(QUICK_8_KEYS);
 const plusSet = new Set(PLUS_17_KEYS);
+export const POLICY_LOCKED_KEYS = [
+  "LPR",
+  "BP",
+  "r_gjj",
+  "Deed1_rate",
+  "Deed2_rate",
+  "VAT_rate",
+  "GJJ_max_single",
+  "GJJ_max_family",
+  "GJJ_max_multichild",
+];
+const policyLockedSet = new Set(POLICY_LOCKED_KEYS);
 
 export type FieldMeta = {
   key: string;
@@ -49,19 +61,19 @@ export const STAGE2_CARD_LAYOUT: Array<{
   keys: string[];
 }> = [
   {
-    title: "Card 1｜资金与收入",
+    title: "资金与收入",
     keys: ["monthly_income", "Emergency", "dp_min", "GJJ_extra"],
   },
   {
-    title: "Card 2｜贷款偏好",
+    title: "贷款偏好",
     keys: ["n_years", "Mix_ratio", "Repay_type", "GJJ_merge"],
   },
   {
-    title: "Card 3｜交易与装修",
+    title: "交易与装修",
     keys: ["holding_years", "M5U", "Reno_hard", "Reno_soft"],
   },
   {
-    title: "Card 4｜租房对照",
+    title: "租房对照",
     keys: ["rent_0", "PM_unit", "years"],
   },
 ];
@@ -129,6 +141,10 @@ export function buildFormilySchema(rawSchema: any): ISchema {
         },
         "x-reactions": [] as any[],
       };
+
+      if (policyLockedSet.has(item.key)) {
+        fieldProp["x-disabled"] = true;
+      }
 
       if (item.key === "M5U") {
         fieldProp["x-component"] = "Switch";
