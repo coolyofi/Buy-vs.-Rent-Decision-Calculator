@@ -2,284 +2,570 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>上海购房 vs 租房 · 智能政策版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>上海购房 vs 租房 · 163 参数专业模型</title>
   <style>
-    body { font-family: "Microsoft YaHei", sans-serif; max-width: 950px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
-    .section { background: white; padding: 16px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    h1, h2 { color: #1a365d; }
-    label { display: inline-block; width: 240px; margin-top: 8px; }
-    input, select { width: 130px; padding: 6px; margin-left: 10px; }
-    button { background: #2c7be5; color: white; border: none; padding: 10px 24px; margin-top: 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #1a5fb4; }
-    .result { margin-top: 20px; padding: 16px; background: #eef7ff; border-left: 5px solid #2c7be5; }
-    .alert { background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin: 10px 0; }
-    .error { background: #f8d7da; color: #721c24; }
-    .success { background: #d4edda; color: #155724; }
-    .highlight { font-weight: bold; color: #d32f2f; }
-    details { margin-top: 15px; }
-    summary { cursor: pointer; font-weight: bold; color: #1a73e8; }
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #1f2933;
+      --muted: #52606d;
+      --primary: #2457e6;
+      --primary-hover: #1b46bd;
+      --border: #dde2e6;
+      --accent: #0b8e3c;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; margin: 0; padding: 24px; background: var(--bg); color: var(--text); }
+    h1 { margin: 0 0 12px 0; font-size: 24px; }
+    h2 { margin: 0 0 8px 0; font-size: 18px; }
+    p { margin: 4px 0 12px 0; color: var(--muted); }
+    .layout { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 12px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    .card + .card { margin-top: 0; }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #e5ebff; color: var(--primary); font-size: 12px; margin-right: 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text); }
+    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fdfdfd; font-size: 14px; color: var(--text); }
+    input:focus, select:focus { outline: 2px solid #c7d5ff; border-color: var(--primary); }
+    .hint { font-size: 12px; color: var(--muted); }
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button { background: var(--primary); color: #fff; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    button:hover { background: var(--primary-hover); }
+    .link { color: var(--primary); text-decoration: none; font-size: 13px; }
+    .alert { padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: 14px; border: 1px solid var(--border); }
+    .alert.success { background: #eef8f2; border-color: #b5e2c5; color: #0f5a2a; }
+    .alert.error { background: #fff1f0; border-color: #f3c1be; color: #a3231a; }
+    .result { background: #f3f6ff; border-left: 4px solid var(--primary); margin-top: 12px; padding: 12px 14px; border-radius: 8px; }
+    details { border: 1px solid var(--border); border-radius: 10px; background: #fbfcfd; padding: 10px 12px; }
+    summary { cursor: pointer; font-weight: 600; color: var(--text); }
+    summary::-webkit-details-marker { display: none; }
+    .tip { position: relative; display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--primary); color: #fff; text-align: center; font-size: 11px; line-height: 14px; margin-left: 6px; cursor: help; }
+    .tip:hover .tooltip { opacity: 1; visibility: visible; }
+    .tooltip { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; width: 240px; opacity: 0; visibility: hidden; transition: opacity 0.15s; z-index: 10; }
+    .section-title { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+    .badge { padding: 2px 8px; border-radius: 8px; background: #eef2f7; color: var(--muted); font-size: 12px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .tag { display: inline-block; background: #edf6ff; color: var(--primary); padding: 2px 8px; border-radius: 6px; font-size: 12px; margin-right: 6px; }
+    .table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    .table th, .table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+    .table th { background: #f6f8fb; }
+    .sticky-actions { position: sticky; top: 12px; align-self: flex-start; }
+    .pill-green { background: #e7f6ec; color: #0a7732; }
+    @media (max-width: 1024px) { .layout { grid-template-columns: 1fr; } .sticky-actions { position: static; } }
   </style>
 </head>
 <body>
+  <h1>上海购房 vs 租房 · 163 参数模型</h1>
+  <p>核心输入保持简洁，其余 150+ 高级参数折叠在卡片内，默认值已填，可悬停查看计算逻辑。金额默认单位为万元（若输入元，将自动转为万元）。</p>
 
-<h1>🏠 上海购房 vs 租房 · 智能政策合规版（2026）</h1>
+  <div class="layout">
+    <div class="card">
+      <div class="section-title">
+        <h2>快速起步（核心必填）</h2>
+        <span class="badge">必填 12 项</span>
+      </div>
+      <div class="grid" id="coreInputs"></div>
+    </div>
 
-<div class="section">
-  <h2>1. 购房者身份信息</h2>
-  <label>户籍类型：</label>
-  <select id="hukou">
-    <option value="shanghai">上海户籍</option>
-    <option value="non-shanghai">非上海户籍</option>
-  </select><br>
+    <div class="card sticky-actions">
+      <div class="section-title">
+        <h2>动作</h2>
+        <span class="badge">即时反馈</span>
+      </div>
+      <div class="toolbar">
+        <button id="analyzeBtn">运行分析</button>
+        <button id="resetBtn" type="button" style="background:#e5e7eb; color:#1f2933;">重置为默认</button>
+      </div>
+      <p class="muted">提示：未在核心区露出的参数全部已自动填充默认值，可在下方高级卡片中逐项调整。</p>
+      <div id="policyAlert" style="display:none;" class="alert"></div>
+      <div id="result" class="result" style="display:none;"></div>
+    </div>
+  </div>
 
-  <label>家庭结构：</label>
-  <select id="familyType">
-    <option value="family">已婚/家庭</option>
-    <option value="single">单身（含未婚、离异、丧偶）</option>
-  </select><br>
-
-  <label>是否多子女家庭：</label>
-  <select id="multiChild">
-    <option value="no">否</option>
-    <option value="yes">是（二孩及以上）</option>
-  </select><br>
-
-  <label>当前名下住房套数：</label>
-  <select id="ownedHouses">
-    <option value="0">0套（首套）</option>
-    <option value="1">1套（二套）</option>
-    <option value="2+">2套及以上</option>
-  </select><br>
-
-  <label>非沪籍：社保/个税缴纳年限（年）：</label>
-  <input type="number" id="socialYears" value="3" min="0" step="0.5">
-</div>
-
-<div class="section">
-  <h2>2. 目标房产信息</h2>
-  <label>房屋总价（元）：</label><input type="number" id="housePrice" value="6000000"><br>
-  <label>建筑面积（㎡）：</label><input type="number" id="area" value="100" step="0.1"><br>
-  <label>所在区域：</label>
-  <select id="ring">
-    <option value="inner">内环内</option>
-    <option value="middle">中外环间</option>
-    <option value="outer">外环外</option>
-  </select><br>
-  <label>是否新房（影响公积金“又提又贷”）：</label>
-  <select id="isNew">
-    <option value="yes">是（新建商品房）</option>
-    <option value="no">否（二手房）</option>
-  </select>
-</div>
-
-<div class="section">
-  <h2>3. 你的资金情况</h2>
-  <label>现金存款（元）：</label><input type="number" id="cash" value="200000"><br>
-  <label>股票市值（元）：</label><input type="number" id="stock" value="300000"><br>
-  <label>股票年化收益（%）：</label><input type="number" id="stockReturn" value="5" step="0.1"><br>
-  <label>公积金账户余额（元）：</label><input type="number" id="gjjBalance" value="100000"><br>
-  <label>月缴存公积金总额（元）：</label><input type="number" id="gjjMonthly" value="3000">
-</div>
-
-<div class="section">
-  <h2>4. 租房假设 & 分析年限</h2>
-  <label>当前月租金（元）：</label><input type="number" id="rent" value="8000"><br>
-  <label>租金年涨幅（%）：</label><input type="number" id="rentGrowth" value="3" step="0.1"><br>
-  <label>分析年限（年）：</label><input type="number" id="years" value="10" min="1" max="30">
-</div>
-
-<button onclick="runAnalysis()">🔍 智能分析（自动适配上海最新政策）</button>
-
-<div id="policyAlert" style="display:none;" class="alert"></div>
-<div id="result" class="result" style="display:none;"></div>
-
-<script>
-function runAnalysis() {
-  // ===== 1. 获取用户输入 =====
-  const hukou = document.getElementById('hukou').value;
-  const familyType = document.getElementById('familyType').value;
-  const multiChild = document.getElementById('multiChild').value === 'yes';
-  const ownedHouses = parseInt(document.getElementById('ownedHouses').value);
-  const socialYears = parseFloat(document.getElementById('socialYears').value) || 0;
-  const housePrice = parseFloat(document.getElementById('housePrice').value) || 0;
-  const area = parseFloat(document.getElementById('area').value) || 0;
-  const ring = document.getElementById('ring').value;
-  const isNew = document.getElementById('isNew').value === 'yes';
-  const cash = parseFloat(document.getElementById('cash').value) || 0;
-  const stock = parseFloat(document.getElementById('stock').value) || 0;
-  const stockReturn = parseFloat(document.getElementById('stockReturn').value) / 100;
-  const gjjBalance = parseFloat(document.getElementById('gjjBalance').value) || 0;
-  const gjjMonthly = parseFloat(document.getElementById('gjjMonthly').value) || 0;
-  const rent = parseFloat(document.getElementById('rent').value) || 0;
-  const rentGrowth = parseFloat(document.getElementById('rentGrowth').value) / 100;
-  const years = parseInt(document.getElementById('years').value) || 10;
-
-  // ===== 2. 判断是否普通住宅 =====
-  let priceLimit = 0;
-  if (ring === 'inner') priceLimit = 7800000;
-  else if (ring === 'middle') priceLimit = 6600000;
-  else priceLimit = 4800000;
-
-  const isOrdinary = (housePrice <= priceLimit) && (area <= 140);
-
-  // ===== 3. 购房资格校验 =====
-  let qualified = true;
-  let disqualifyReason = '';
-
-  if (hukou === 'non-shanghai') {
-    if (ring !== 'outer') {
-      if (socialYears < 3) {
-        qualified = false;
-        disqualifyReason = '非沪籍购买内环或中外环房产需连续缴纳社保满3年。';
-      }
-    } else {
-      if (socialYears < 1) {
-        qualified = false;
-        disqualifyReason = '非沪籍购买外环外房产需社保满1年。';
-      }
-    }
-  }
-
-  // 单身限购（内环/中外环）
-  if (familyType === 'single' && ring !== 'outer' && hukou === 'shanghai') {
-    if (ownedHouses >= 1) {
-      qualified = false;
-      disqualifyReason = '沪籍单身在内环/中外环限购1套，您已有住房。';
-    }
-  }
-
-  // 显示资格状态
-  const alertDiv = document.getElementById('policyAlert');
-  if (!qualified) {
-    alertDiv.className = 'alert error';
-    alertDiv.innerText = '❌ 购房资格不符：' + disqualifyReason;
-    alertDiv.style.display = 'block';
-    document.getElementById('result').style.display = 'none';
-    return;
-  } else {
-    alertDiv.className = 'alert success';
-    alertDiv.innerText = '✅ 符合上海购房资格！';
-    alertDiv.style.display = 'block';
-  }
-
-  // ===== 4. 首付比例 =====
-  let downPaymentRate = 0.35; // 默认
-  const isFirstHome = ownedHouses === 0;
-
-  if (isFirstHome) {
-    downPaymentRate = isOrdinary ? 0.20 : 0.35;
-  } else if (ownedHouses === 1) {
-    downPaymentRate = isOrdinary ? 0.35 : 0.70;
-  } else {
-    downPaymentRate = 0.70; // 三套及以上基本停贷
-  }
-
-  // ===== 5. 公积金贷款额度 =====
-  let gjjMax = 1400000; // 家庭默认
-  if (familyType === 'single') gjjMax = 700000;
-  if (multiChild) gjjMax = 2160000;
-
-  // 可贷额度受余额限制：余额 × 40（上海倍数）
-  const gjjLoanByBalance = gjjBalance * 40;
-  let actualGjjLoan = Math.min(gjjMax, gjjLoanByBalance, housePrice * (1 - downPaymentRate));
-
-  // 若外环外新房，可“又提又贷”，但不影响贷款额，仅影响首付来源
-
-  // ===== 6. 商业贷款 =====
-  const totalLoanNeeded = housePrice * (1 - downPaymentRate);
-  const commercialLoan = Math.max(0, totalLoanNeeded - actualGjjLoan);
-
-  // 利率（2026年商贷首套二套统一，但公积金区分）
-  const commercialRate = 0.035; // 假设3.5%
-  const gjjRate = isFirstHome ? 0.0285 : 0.03325;
-
-  // ===== 7. 月供计算 =====
-  function calcMonthlyPayment(principal, annualRate, years) {
-    if (principal <= 0) return 0;
-    const r = annualRate / 12;
-    const n = years * 12;
-    return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-  }
-
-  const gjjMonthlyPayment = calcMonthlyPayment(actualGjjLoan, gjjRate, 30);
-  const commercialMonthlyPayment = calcMonthlyPayment(commercialLoan, commercialRate, 30);
-  const totalMonthlyPayment = gjjMonthlyPayment + commercialMonthlyPayment;
-
-  // ===== 8. 税费 =====
-  // 契税
-  let deedTaxRate = 0.03; // 默认三套
-  if (isFirstHome) {
-    deedTaxRate = area <= 90 ? 0.01 : 0.015;
-  } else if (ownedHouses === 1) {
-    deedTaxRate = area <= 90 ? 0.01 : 0.02;
-  }
-  const deedTax = housePrice * deedTaxRate;
-
-  // 中介费（假设2%）
-  const agentFee = housePrice * 0.02;
-  // 维修基金（假设100元/㎡）
-  const maintenanceFund = area * 100;
-  // 装修（估算）
-  const renovation = housePrice * 0.05; // 5%
-
-  const oneTimeCost = housePrice * downPaymentRate + deedTax + agentFee + maintenanceFund + renovation;
-
-  // ===== 9. 年持有成本 =====
-  const propertyFee = 5; // 元/㎡/月
-  const annualProperty = propertyFee * area * 12;
-
-  // 房产税（简化：若不符合免税条件则估算）
-  let annualPropertyTax = 0;
-  // 此处简化：假设首套均免税（因非沪籍满3年或沪籍）
-  // 如需精确，可扩展人均面积逻辑
-
-  const annualHousingCost = totalMonthlyPayment * 12 + annualProperty + annualPropertyTax;
-
-  // ===== 10. 购房总成本（含机会成本）=====
-  const housingCashOut = oneTimeCost + annualHousingCost * years;
-  const investable = cash + stock + gjjBalance;
-  const usedInOneTime = Math.min(investable, oneTimeCost);
-  const opportunityCost = usedInOneTime * (Math.pow(1 + stockReturn, years) - 1);
-  const buyTotal = housingCashOut + opportunityCost;
-
-  // ===== 11. 租房总成本 =====
-  let rentTotal = 0;
-  let r = rent;
-  for (let i = 0; i < years; i++) {
-    rentTotal += r * 12;
-    r *= (1 + rentGrowth);
-  }
-
-  // ===== 12. 输出结果 =====
-  const diff = buyTotal - rentTotal;
-  const recommendation = diff > 0 ? '租房更省' : '购房更省';
-
-  let resultHTML = `
-    <h3>📊 分析结果（${years}年周期）</h3>
-    <p>📍 房屋类型：${isOrdinary ? '普通住宅' : '非普通住宅'} · ${ring === 'inner' ? '内环内' : ring === 'middle' ? '中外环' : '外环外'}</p>
-    <p>💰 <strong>购房总成本（含机会成本）：</strong><span class="highlight">${Math.round(buyTotal).toLocaleString()}</span> 元</p>
-    <p>🏠 <strong>租房总支出：</strong><span class="highlight">${Math.round(rentTotal).toLocaleString()}</span> 元</p>
-    <p>⚖️ <strong>差额：</strong>${Math.round(diff).toLocaleString()} 元（${recommendation}）</p>
-    
-    <details><summary>📝 贷款与税费明细</summary>
-      <ul>
-        <li>首付比例：${(downPaymentRate * 100).toFixed(0)}% → ${Math.round(housePrice * downPaymentRate).toLocaleString()} 元</li>
-        <li>公积金贷款：${Math.round(actualGjjLoan).toLocaleString()} 元（利率 ${(gjjRate * 100).toFixed(2)}%）</li>
-        <li>商业贷款：${Math.round(commercialLoan).toLocaleString()} 元（利率 ${(commercialRate * 100).toFixed(2)}%）</li>
-        <li>月供合计：${Math.round(totalMonthlyPayment).toLocaleString()} 元/月</li>
-        <li>契税：${Math.round(deedTax).toLocaleString()} 元（税率 ${(deedTaxRate * 100).toFixed(1)}%）</li>
-        <li>中介费：${Math.round(agentFee).toLocaleString()} 元</li>
-        <li>装修（估算）：${Math.round(renovation).toLocaleString()} 元</li>
-        <li>物业费（${years}年）：${Math.round(annualProperty * years).toLocaleString()} 元</li>
-      </ul>
+  <div class="card">
+    <div class="section-title">
+      <h2>高级参数总览（全量 163 项）</h2>
+      <span class="badge">可折叠，每项含默认与说明</span>
+    </div>
+    <details open>
+      <summary>展开/折叠全部分组</summary>
+      <div id="advancedSections" style="margin-top:10px; display:flex; flex-direction:column; gap:14px;"></div>
     </details>
-  `;
+  </div>
 
-  document.getElementById('result').innerHTML = resultHTML;
-  document.getElementById('result').style.display = 'block';
-}
-</script>
+  <script>
+    // 核心参数（12 项，驱动快速计算）
+    const coreParameters = [
+      { id: 'hukou', label: '户籍类型', type: 'select', options: [{v:'shanghai',t:'上海户籍'},{v:'non-shanghai',t:'非上海户籍'}], defaultValue:'shanghai', desc:'决定限购门槛与首付比例。'},
+      { id: 'familyType', label: '家庭结构', type: 'select', options: [{v:'family',t:'已婚/家庭'},{v:'single',t:'单身'}], defaultValue:'family', desc:'单身在内环/中外环限购 1 套。'},
+      { id: 'multiChild', label: '是否多子女', type: 'select', options: [{v:'no',t:'否'},{v:'yes',t:'是'}], defaultValue:'no', desc:'影响公积金最高额度。'},
+      { id: 'ownedHouses', label: '当前名下套数', type: 'select', options: [{v:'0',t:'0 套'},{v:'1',t:'1 套'},{v:'2+',t:'2 套及以上'}], defaultValue:'0', desc:'决定首付率与限贷。'},
+      { id: 'socialYears', label: '非沪籍社保年限', type: 'number', defaultValue:3, step:0.5, desc:'内中环需≥3 年，外环外≥1 年。', unit:'年' },
+      { id: 'housePrice', label: '房屋总价', type: 'number', defaultValue:600, unit:'万元', desc:'合同网签价，决定税费与首付。'},
+      { id: 'area', label: '建筑面积', type: 'number', defaultValue:100, step:0.1, unit:'㎡', desc:'普通住宅面积上限 140㎡。'},
+      { id: 'ring', label: '所在区域', type: 'select', options: [{v:'inner',t:'内环内'},{v:'middle',t:'中外环间'},{v:'outer',t:'外环外'}], defaultValue:'middle', desc:'影响普通住宅认定与限购。'},
+      { id: 'isNew', label: '是否新房', type: 'select', options: [{v:'yes',t:'新建商品房'},{v:'no',t:'二手房'}], defaultValue:'yes', desc:'影响公积金提取与税费。'},
+      { id: 'cash', label: '现金存款', type: 'number', defaultValue:20, unit:'万元', desc:'首付与流动性来源。'},
+      { id: 'stock', label: '股票市值', type: 'number', defaultValue:30, unit:'万元', desc:'可作为首付或继续投资。'},
+      { id: 'stockReturn', label: '投资年化收益率', type: 'number', defaultValue:5, unit:'%', step:0.1, desc:'机会成本，采用实际可达收益。'},
+      { id: 'gjjBalance', label: '公积金余额', type: 'number', defaultValue:10, unit:'万元', desc:'余额×40 上限控制贷额度。'},
+      { id: 'gjjMonthly', label: '月缴公积金', type: 'number', defaultValue:0.3, unit:'万元', step:0.01, desc:'用于冲抵月供或付租。'},
+      { id: 'rent', label: '当前月租', type: 'number', defaultValue:0.8, unit:'万元', step:0.01, desc:'租房对照基准。'},
+      { id: 'rentGrowth', label: '租金年涨幅', type: 'number', defaultValue:3, unit:'%', step:0.1, desc:'租房端增长假设。'},
+      { id: 'years', label: '分析年限', type: 'number', defaultValue:10, unit:'年', desc:'建议 10-30 年。'}
+    ];
 
+    // 全量 163 参数定义（含新增项），按 14 组
+    const parameterGroups = [
+      {
+        name: '一 取得成本 (20)',
+        items: [
+          {id:1, key:'P', label:'合同网签价', unit:'万元', def:600, tier:'core', hint:'交易基准价，影响全部税费与首付。'},
+          {id:2, key:'P_eval', label:'贷款评估价', unit:'万元', def:570, hint:'银行评估，低于网签会抬升首付。'},
+          {id:3, key:'VAT_rate', label:'增值税税率', unit:'%', def:0, hint:'满2年普通免征，未满按 5% 简化。'},
+          {id:4, key:'CT_rate', label:'城市维护建设税率', unit:'%', def:7, hint:'按增值税附加，默认 7%。'},
+          {id:5, key:'Edu_rate', label:'教育附加', unit:'%', def:3, hint:'按增值税附加。'},
+          {id:6, key:'LocalEdu_rate', label:'地方教育附加', unit:'%', def:2, hint:'按增值税附加。'},
+          {id:7, key:'Deed1_rate', label:'契税首套', unit:'%', def:1.5, hint:'90㎡以下 1%，以上 1.5%。'},
+          {id:8, key:'Deed2_rate', label:'契税二套', unit:'%', def:2, hint:'90㎡以下 1%，以上 2%。'},
+          {id:9, key:'PIT_gross_rate', label:'个税核定', unit:'%', def:1.5, hint:'按总价核定 1-2%。'},
+          {id:10, key:'PIT_gain_rate', label:'个税差额', unit:'%', def:20, hint:'按增值额 20%。'},
+          {id:11, key:'M5U', label:'满五唯一', unit:'标记', def:'yes', hint:'决定个税是否免征。'},
+          {id:12, key:'Buyer_agent_rate', label:'买方中介费率', unit:'%', def:1.5, hint:'常见 1%-2%。'},
+          {id:13, key:'Seller_to_buyer_rate', label:'卖方佣金转嫁', unit:'%', def:0.5, hint:'卖方费用转嫁给买方部分。'},
+          {id:14, key:'Reg_fee', label:'登记费', unit:'万元', def:0.1, hint:'权属登记固定费用。'},
+          {id:15, key:'Stamp_rate', label:'印花税', unit:'%', def:0, hint:'住宅通常免，非住宅 0.05%。'},
+          {id:16, key:'Land_fee', label:'土地收益金', unit:'万元', def:0, hint:'公房/房改房需考虑。'},
+          {id:17, key:'Reno_hard', label:'硬装预算', unit:'万元', def:30, hint:'建议按房价 5%。'},
+          {id:18, key:'Reno_soft', label:'软装家电', unit:'万元', def:12, hint:'建议按房价 2%。'},
+          {id:19, key:'Parking_upfront', label:'车位首款', unit:'万元', def:0, hint:'购买或认购车位的首付。'},
+          {id:20, key:'PM_deposit', label:'前期物业押金', unit:'万元', def:0.5, hint:'交房阶段缴纳。'}
+        ]
+      },
+      {
+        name: '二 贷款与现金流 (15)',
+        items: [
+          {id:21, key:'dp_min', label:'首付下限', unit:'%', def:20, tier:'core', hint:'按套数与普通/非普通确定。'},
+          {id:22, key:'LPR', label:'商贷基准利率', unit:'%', def:3.5, hint:'LPR 基础。'},
+          {id:23, key:'BP', label:'银行加点', unit:'BP', def:0, hint:'相对 LPR 加点。'},
+          {id:24, key:'r_gjj', label:'公积金利率', unit:'%', def:2.85, hint:'首套 2.85%，二套 3.325%。'},
+          {id:25, key:'Mix_ratio', label:'组合贷占比', unit:'%', def:50, hint:'公积金占总贷比例。'},
+          {id:26, key:'n_years', label:'还款周期', unit:'年', def:30, hint:'20 或 30 年。'},
+          {id:27, key:'Repay_type', label:'还款方式', unit:'选项', def:'等额本息', hint:'等额本息/等额本金。'},
+          {id:28, key:'DTI', label:'月供收入比', unit:'%', def:0, hint:'输出指标，建议低于 40%。'},
+          {id:29, key:'Prepay_fee_rate', label:'提前还贷违约金', unit:'%', def:2, hint:'按剩余本金或若干期利息。'},
+          {id:30, key:'GJJ_offset', label:'公积金月冲还贷', unit:'元', def:0, hint:'抵扣月供现金流。'},
+          {id:31, key:'GJJ_extra', label:'公积金补充缴存', unit:'元', def:0, hint:'补充账户缴存额。'},
+          {id:32, key:'Loan_service', label:'贷款服务费', unit:'万元', def:0.1, hint:'评估/服务费用。'},
+          {id:33, key:'Reprice_cycle', label:'利率重定价周期', unit:'月', def:12, hint:'LPR 更新周期。'},
+          {id:34, key:'Deduct_limit', label:'房贷利息个税抵扣', unit:'元/月', def:1000, hint:'个税专项附加扣除。'},
+          {id:35, key:'Grace_months', label:'宽限期', unit:'月', def:0, hint:'只还息不还本期限。'}
+        ]
+      },
+      {
+        name: '三 持有期运营 (12)',
+        items: [
+          {id:36, key:'PM_unit', label:'物业费单价', unit:'元/㎡/月', def:5, hint:'基础物业费。'},
+          {id:37, key:'PM_growth', label:'物业费调增率', unit:'%', def:3, hint:'每年增长率。'},
+          {id:38, key:'Exempt_area_percap', label:'房产税免征面积/人', unit:'㎡', def:60, hint:'上海试行标准。'},
+          {id:39, key:'PropertyTax_rate', label:'房产税率', unit:'%', def:0.4, hint:'0.4% 或 0.6%。'},
+          {id:40, key:'Maintenance_yearly', label:'年度维护费', unit:'元/㎡/年', def:30, hint:'墙面、防水等。'},
+          {id:41, key:'Large_replace', label:'大型设备更换', unit:'万元', def:2, hint:'第10年电梯/空调等。'},
+          {id:42, key:'Fund_supp', label:'大修基金补缴', unit:'万元', def:0, hint:'补缴或追加。'},
+          {id:43, key:'Parking_mgmt', label:'车位管理费', unit:'元/月', def:0, hint:'地库车位管理。'},
+          {id:44, key:'Broadband', label:'宽带电视', unit:'元/月', def:120, hint:'通信费用。'},
+          {id:45, key:'Energy_premium', label:'能耗溢价', unit:'元/月', def:0, hint:'大面积能耗溢价。'},
+          {id:46, key:'Insurance', label:'财产保险', unit:'元/年', def:800, hint:'房屋及财产险。'},
+          {id:47, key:'Vacancy', label:'空置期成本', unit:'元/月', def:0, hint:'投资出租时的闲置成本。'}
+        ]
+      },
+      {
+        name: '四 租房端特有 (13)',
+        items: [
+          {id:48, key:'rent_0', label:'初始月租', unit:'元', def:8000, tier:'core', hint:'租房对照基准。'},
+          {id:49, key:'Deposit_mult', label:'押金倍数', unit:'倍', def:1.25, hint:'押一付三=1+3/12。'},
+          {id:50, key:'g_r', label:'租金涨幅', unit:'%', def:3, hint:'年化增长率。'},
+          {id:51, key:'Rent_agent_rate', label:'租房中介费率', unit:'月租', def:0.5, hint:'半个月租金常见。'},
+          {id:52, key:'Move_freq_years', label:'换房频率', unit:'年/次', def:2, hint:'平均换租周期。'},
+          {id:53, key:'Move_cost', label:'搬家费', unit:'元/次', def:3000, hint:'搬迁物流。'},
+          {id:54, key:'Furn_depr', label:'家具折旧', unit:'元/次', def:2000, hint:'非拎包入住投入。'},
+          {id:55, key:'Residence_fee', label:'居住证办理', unit:'元/年', def:0, hint:'按需填写。'},
+          {id:56, key:'Rent_tax_rate', label:'租房开票税率', unit:'%', def:1, hint:'若需发票。'},
+          {id:57, key:'GJJ_rent_cap', label:'公积金付租上限', unit:'元/月', def:0, hint:'每月可提取额度。'},
+          {id:58, key:'Commute_delta', label:'通勤成本差额', unit:'元/月', def:0, hint:'租房距离工作地点的节省/增加。'},
+          {id:59, key:'Overlap_rent', label:'叠租成本', unit:'元/次', def:0, hint:'换租重叠租金。'},
+          {id:60, key:'Social_cost', label:'社交环境重建', unit:'元/次', def:0, hint:'生活圈重建的时间与成本。'}
+        ]
+      },
+      {
+        name: '五 机会成本与再投资 (10)',
+        items: [
+          {id:61, key:'R_inv', label:'初始资金收益率', unit:'%', def:5, hint:'无房投资回报假设。'},
+          {id:62, key:'R_delta', label:'月供差额收益率', unit:'%', def:5, hint:'租金与月供差额的投资收益。'},
+          {id:63, key:'R_taxsave', label:'税费节省收益率', unit:'%', def:5, hint:'节省税费再投资的收益。'},
+          {id:64, key:'Liquidity_premium', label:'流动性溢价', unit:'折现', def:1, hint:'保持流动性的价值折现。'},
+          {id:65, key:'Dividend_reinvest', label:'分红再投资率', unit:'%', def:100, hint:'分红继续投资比例。'},
+          {id:66, key:'Invest_fee_rate', label:'投资管理费', unit:'%', def:0.2, hint:'账户管理费用。'},
+          {id:67, key:'CPI', label:'通胀率', unit:'%', def:2, hint:'实际收益需扣除通胀。'},
+          {id:68, key:'FX_dep', label:'货币贬值预期', unit:'%', def:0, hint:'跨币种或通胀风险。'},
+          {id:69, key:'Beta', label:'风险系数', unit:'无量纲', def:1, hint:'组合波动率折现。'},
+          {id:70, key:'Emergency', label:'紧急备用金', unit:'万元', def:6, hint:'至少覆盖 6 个月支出。'}
+        ]
+      },
+      {
+        name: '六 退出与残值 (10)',
+        items: [
+          {id:71, key:'g_p', label:'房价年化增长', unit:'%', def:3, hint:'长期房价增速。'},
+          {id:72, key:'Seller_tax_rate', label:'卖方个税', unit:'%', def:0, hint:'满五唯一为 0，否则差额 20%。'},
+          {id:73, key:'Seller_agent_rate', label:'卖方中介费率', unit:'%', def:2, hint:'卖方承担佣金比例。'},
+          {id:74, key:'VAT_addon_exit', label:'退出增值税附加', unit:'%', def:0, hint:'与取得期规则一致。'},
+          {id:75, key:'Bal_remain', label:'卖出时剩余本金', unit:'万元', def:0, hint:'由摊还表决定。'},
+          {id:76, key:'Depreciation_rate', label:'成新折损', unit:'%', def:10, hint:'折旧率，影响房屋成新。'},
+          {id:77, key:'Land_renew', label:'土地续期费', unit:'万元', def:0, hint:'70 年期届满续期成本。'},
+          {id:78, key:'Time_cost', label:'卖房时间成本', unit:'万元', def:0.1, hint:'售房周期的时间成本。'},
+          {id:79, key:'Escrow_fee', label:'资金监管费', unit:'万元', def:0.05, hint:'交易监管账户费用。'},
+          {id:80, key:'Transfer_fee', label:'回流手续费', unit:'万元', def:0, hint:'大额资金划转成本。'}
+        ]
+      },
+      {
+        name: '七 宏观与社会价值 (10)',
+        items: [
+          {id:81, key:'School_premium', label:'学区溢价', unit:'万元', def:0, hint:'对口学区带来的溢价。'},
+          {id:82, key:'Medical_weight', label:'医疗配套权重', unit:'0-1', def:0.5, hint:'医疗资源对效用的权重。'},
+          {id:83, key:'Metro_premium', label:'轨交溢价', unit:'万元', def:0, hint:'地铁影响的溢价。'},
+          {id:84, key:'Hukou_weight', label:'落户积分权重', unit:'0-1', def:0.5, hint:'购房对落户的加成。'},
+          {id:85, key:'Rent_right_weight', label:'租购同权成熟度', unit:'0-1', def:0.5, hint:'租房入学权的保障程度。'},
+          {id:86, key:'Pop_growth', label:'人口流入预测', unit:'%', def:1, hint:'人口支撑房价的能力。'},
+          {id:87, key:'Plan_realize', label:'区域规划兑现率', unit:'0-1', def:0.6, hint:'规划落地概率。'},
+          {id:88, key:'Climate_score', label:'气候适应性', unit:'0-1', def:0.5, hint:'湿热、噪音、采光适配。'},
+          {id:89, key:'Peace_discount', label:'心理安稳折现', unit:'0-1', def:0.95, hint:'自有房产的效用加成。'},
+          {id:90, key:'Freedom_score', label:'主权决策权', unit:'0-1', def:0.5, hint:'装修、宠物等自由度。'}
+        ]
+      },
+      {
+        name: '八 生命周期与突发 (10)',
+        items: [
+          {id:91, key:'Career_years', label:'职业剩余年限', unit:'年', def:20, hint:'决定未来收入稳定性。'},
+          {id:92, key:'g_salary', label:'薪资增长', unit:'%', def:3, hint:'收入提升抵御通胀。'},
+          {id:93, key:'Kids_change', label:'子女数量变化', unit:'人', def:0, hint:'房间数需求。'},
+          {id:94, key:'Medical_future', label:'家庭医疗支出', unit:'元/年', def:0, hint:'长期医疗成本。'},
+          {id:95, key:'Estate_tax_rate', label:'遗产税预期', unit:'%', def:0, hint:'长期资产传承税率。'},
+          {id:96, key:'Divorce_prob', label:'婚姻变动风险', unit:'概率', def:0, hint:'财产分割风险。'},
+          {id:97, key:'Gap_secondary', label:'二套资格间隔', unit:'年', def:0, hint:'卖首套后再买二套的等待期。'},
+          {id:98, key:'Policy_vol', label:'政策变动频率', unit:'等级', def:'中', hint:'限购松绑/收紧节奏。'},
+          {id:99, key:'Neighborhood_score', label:'邻里稳定性', unit:'0-1', def:0.6, hint:'社区圈层与稳定度。'},
+          {id:100, key:'Tail_risk_prob', label:'极端风险概率', unit:'概率', def:0.05, hint:'收入中断/房价下跌事件概率。'}
+        ]
+      },
+      {
+        name: '九 资金结构与现金流安全 (15)',
+        items: [
+          {id:101, key:'Liquid_ratio', label:'流动现金占比', unit:'%', def:20, hint:'建议 >=20%。'},
+          {id:102, key:'Cash_runway_months', label:'可动用现金月数', unit:'月', def:6, hint:'失业可支撑时间。'},
+          {id:103, key:'Credit_util', label:'信用额度利用率', unit:'%', def:30, hint:'备用信贷占额度比例。'},
+          {id:104, key:'Income_concentration', label:'收入集中度', unit:'无量纲', def:1, hint:'单一工资=1，多收入<1。'},
+          {id:105, key:'Bonus_vol', label:'奖金波动系数', unit:'无量纲', def:0.5, hint:'奖金不稳定程度。'},
+          {id:106, key:'Unemployed_months', label:'失业现金流月数', unit:'月', def:6, hint:'可持续月份。'},
+          {id:107, key:'Mortgage_to_debt', label:'房贷/总负债', unit:'%', def:70, hint:'杠杆安全阈值。'},
+          {id:108, key:'Fixed_burden', label:'固定支出刚性指数', unit:'无量纲', def:0.6, hint:'房贷+家庭固定支出占比。'},
+          {id:109, key:'DTI_stress', label:'收入下降20%压力 DTI', unit:'%', def:0, hint:'输出指标，检验抗压。'},
+          {id:110, key:'Career_switch_cost', label:'职业转换成本', unit:'万元', def:0.5, hint:'跨行业或转岗成本。'},
+          {id:111, key:'Parent_med', label:'父母医疗支出', unit:'元/年', def:0, hint:'潜在长期支出。'},
+          {id:112, key:'Family_support', label:'家庭支持持续性', unit:'万元/年', def:0, hint:'来自或给予家庭的现金流。'},
+          {id:113, key:'Future_big', label:'未来大额支出', unit:'万元', def:0, hint:'换车/教育等。'},
+          {id:114, key:'Cash_to_real', label:'现金 vs 不动产比例', unit:'%', def:30, hint:'资产配置流动性。'},
+          {id:115, key:'Anxiety_threshold', label:'心理焦虑阈值', unit:'月供/收入', def:0.5, hint:'月供超过此比例易产生压力。'}
+        ]
+      },
+      {
+        name: '十 公积金真实变量 (10)',
+        items: [
+          {id:116, key:'GJJ_growth', label:'公积金账户增长率', unit:'%', def:5, hint:'缴存+利息年化。'},
+          {id:117, key:'GJJ_policy_risk', label:'公积金提取政策风险', unit:'0-1', def:0.3, hint:'政策收紧概率。'},
+          {id:118, key:'GJJ_drop_prob', label:'换工作缴存下降概率', unit:'概率', def:0.2, hint:'断缴或降缴风险。'},
+          {id:119, key:'GJJ_offset_priority', label:'冲还贷优先级', unit:'等级', def:'高', hint:'优先冲抵月供还是保留收益。'},
+          {id:120, key:'GJJ_cap_change', label:'贷款额度政策变化', unit:'万元', def:0, hint:'未来额度上/下调。'},
+          {id:121, key:'GJJ_merge', label:'双人合并可能性', unit:'布尔', def:'yes', hint:'夫妻合并贷。'},
+          {id:122, key:'GJJ_transfer_cost', label:'异地转移成本', unit:'万元', def:0, hint:'转移至上海的成本。'},
+          {id:123, key:'GJJ_gap_penalty', label:'断缴资格影响', unit:'月', def:12, hint:'断缴多少月影响贷款。'},
+          {id:124, key:'GJJ_oc', label:'余额机会成本', unit:'折现', def:0, hint:'余额不用作投资的代价。'},
+          {id:125, key:'GJJ_prepay_vs_keep', label:'公积金提前还贷差额', unit:'输出', def:0, hint:'提前还贷与继续留存收益对比。'}
+        ]
+      },
+      {
+        name: '十一 投资端行为 (12)',
+        items: [
+          {id:126, key:'Invest_consistency', label:'投资执行一致性', unit:'0-1', def:0.7, hint:'计划与实际一致度。'},
+          {id:127, key:'DCA_prob', label:'下跌定投概率', unit:'概率', def:0.6, hint:'市场下跌时坚持定投的概率。'},
+          {id:128, key:'Risk_aversion', label:'风险厌恶系数', unit:'无量纲', def:1, hint:'越高越保守。'},
+          {id:129, key:'Drawdown_tol', label:'回撤容忍度', unit:'%', def:20, hint:'可接受的最大回撤。'},
+          {id:130, key:'Rebalance_freq', label:'再平衡频率', unit:'周期', def:'年度', hint:'资产配置再平衡节奏。'},
+          {id:131, key:'R_after_tax', label:'税后实际收益率', unit:'%', def:4.5, hint:'扣税后的收益。'},
+          {id:132, key:'Recovery_years', label:'黑天鹅恢复周期', unit:'年', def:3, hint:'大跌后回本时间。'},
+          {id:133, key:'Discipline_discount', label:'持仓纪律折现', unit:'折现', def:0.9, hint:'执行偏差折损收益。'},
+          {id:134, key:'Mistake_prob', label:'误操作概率', unit:'概率', def:0.02, hint:'操作失误导致损失。'},
+          {id:135, key:'Invest_time', label:'投资时间成本', unit:'小时/月', def:2, hint:'管理投资所需时间。'},
+          {id:136, key:'Emotional_loss_rate', label:'情绪交易损失率', unit:'%', def:1, hint:'情绪化交易带来的损耗。'},
+          {id:137, key:'Early_use_prob', label:'资金被迫提前使用概率', unit:'概率', def:0.1, hint:'突发事件导致动用投资的概率。'}
+        ]
+      },
+      {
+        name: '十二 租房隐藏成本 (10)',
+        items: [
+          {id:138, key:'Landlord_risk', label:'房东提前收回风险', unit:'概率', def:0.1, hint:'解约或出售风险。'},
+          {id:139, key:'Rent_reno_risk', label:'装修质量不可控成本', unit:'元/年', def:0, hint:'居住体验损耗。'},
+          {id:140, key:'Leave_loss', label:'搬迁休假时间损失', unit:'元/次', def:0, hint:'请假搬家损失。'},
+          {id:141, key:'Negotiate_fail', label:'租约谈判失败风险', unit:'概率', def:0.1, hint:'续租失败概率。'},
+          {id:142, key:'Upgrade_prob', label:'被迫升级租金档位概率', unit:'概率', def:0.1, hint:'租金上涨超预期。'},
+          {id:143, key:'Mismatch_loss', label:'家具不匹配损耗', unit:'元/次', def:0, hint:'家具尺寸/风格不匹配。'},
+          {id:144, key:'Restriction_cost', label:'宠物改造限制成本', unit:'元/年', def:0, hint:'限制带来的替代成本。'},
+          {id:145, key:'Rent_stability_discount', label:'租房稳定性折现', unit:'折现', def:0.95, hint:'租房效用折现。'},
+          {id:146, key:'Rent_vs_salary_gap', label:'租金涨幅与工资差', unit:'输出', def:0, hint:'租金增速减工资增速。'},
+          {id:147, key:'Social_capital_loss', label:'社交资本损耗', unit:'元/次', def:0, hint:'迁居导致的社交损失。'}
+        ]
+      },
+      {
+        name: '十三 物理生命周期 (8)',
+        items: [
+          {id:148, key:'Structure_stage', label:'结构寿命阶段', unit:'阶段', def:'10-20', hint:'0-10/10-20/20+ 年。'},
+          {id:149, key:'Age_discount', label:'楼龄折价', unit:'%/年', def:0.5, hint:'10 年后每年折价。'},
+          {id:150, key:'Elevator_cycle', label:'电梯维护周期', unit:'年', def:10, hint:'大修周期。'},
+          {id:151, key:'Pipe_prob', label:'管线老化概率', unit:'概率/年', def:0.05, hint:'水电气老化风险。'},
+          {id:152, key:'Redev_prob', label:'旧改可能性', unit:'概率', def:0.1, hint:'旧改带来溢价或干扰。'},
+          {id:153, key:'Energy_upgrade', label:'能耗标准升级成本', unit:'万元', def:0, hint:'节能改造成本。'},
+          {id:154, key:'Light_noise_discount', label:'采光噪音折现', unit:'%', def:2, hint:'朝向/噪音对价格折扣。'},
+          {id:155, key:'PM_quality_prob', label:'物业质量变化概率', unit:'概率', def:0.1, hint:'物业更替导致服务变化。'}
+        ]
+      },
+      {
+        name: '十四 政策与制度不确定性 (8)',
+        items: [
+          {id:156, key:'RE_tax_prob', label:'房地产税推行概率', unit:'概率', def:0.2, hint:'未来房产税落地概率。'},
+          {id:157, key:'LQ_relax_prob', label:'限购松绑概率', unit:'概率', def:0.2, hint:'放松限购可能性。'},
+          {id:158, key:'Shift_rate', label:'房贷利率中枢变化', unit:'%', def:0, hint:'长期利率趋势调整。'},
+          {id:159, key:'Rent_market_maturity', label:'租赁市场成熟度', unit:'0-1', def:0.5, hint:'制度完善度。'},
+          {id:160, key:'Aging_impact', label:'人口老龄化影响', unit:'折减', def:0.1, hint:'对住房需求的折减。'},
+          {id:161, key:'Industry_move_prob', label:'产业迁移风险', unit:'概率', def:0.1, hint:'产业外迁对房价的影响。'},
+          {id:162, key:'Supply_shift', label:'供应结构变化', unit:'折减', def:0, hint:'新增供应对价格的压制。'},
+          {id:163, key:'Public_house_competition', label:'公共住房竞争', unit:'折减', def:0.05, hint:'保障房供给对市场房的影响。'}
+        ]
+      }
+    ];
+
+    // 渲染核心输入
+    const coreContainer = document.getElementById('coreInputs');
+    coreParameters.forEach(param => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <label>${param.label}
+          <div style="display:flex; gap:6px; align-items:center;">
+            ${param.type === 'select' ? renderSelect(param) : renderInput(param)}
+            <span class="tip">i<span class="tooltip">${param.desc || ''}${param.unit ? ' | 单位: ' + param.unit : ''}</span></span>
+          </div>
+          ${param.unit ? `<span class="hint">默认 ${param.defaultValue}${param.unit === '%' ? '%' : param.unit}</span>` : `<span class="hint">默认 ${param.defaultValue}</span>`}
+        </label>
+      `;
+      coreContainer.appendChild(wrap);
+    });
+
+    function renderInput(p) {
+      const step = p.step ? `step="${p.step}"` : '';
+      const unitAttr = p.unit ? `data-unit="${p.unit}"` : '';
+      return `<input id="${p.id}" type="number" value="${p.defaultValue}" ${step} ${unitAttr} />`;
+    }
+    function renderSelect(p) {
+      return `<select id="${p.id}">${p.options.map(o=>`<option value="${o.v}" ${o.v===p.defaultValue?'selected':''}>${o.t}</option>`).join('')}</select>`;
+    }
+
+    // 渲染高级分组与参数
+    const advanced = document.getElementById('advancedSections');
+    parameterGroups.forEach(group => {
+      const block = document.createElement('details');
+      block.open = false;
+      block.innerHTML = `<summary>${group.name}</summary><div class="grid" style="margin-top:10px;"></div>`;
+      const grid = block.querySelector('.grid');
+      group.items.forEach(item => {
+        const wrap = document.createElement('div');
+        const defaultStr = typeof item.def === 'number' ? item.def : item.def;
+        const unitAttr = item.unit ? `data-unit="${item.unit}"` : '';
+        const inputId = `adv-${item.id}-${item.key}`;
+        wrap.innerHTML = `
+          <label>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>${item.id}. ${item.label}</span>
+              <span class="tip">i<span class="tooltip">${item.hint || ''}${item.unit ? ' | 单位: ' + item.unit : ''}</span></span>
+              ${item.tier === 'core' ? '<span class="tag">核心映射</span>' : ''}
+            </div>
+            <input id="${inputId}" type="text" value="${defaultStr}" ${unitAttr} />
+            <span class="hint">默认 ${defaultStr}${item.unit ? ' ' + item.unit : ''}</span>
+          </label>
+        `;
+        grid.appendChild(wrap);
+      });
+      advanced.appendChild(block);
+    });
+
+    // 工具函数：金额统一处理，万元输入为元输出
+    function normalizeAmount(value, unit) {
+      const num = parseFloat(value);
+      if (isNaN(num)) return 0;
+      if (!unit) return num;
+      if (unit.includes('万元')) return num * 10000;
+      if (unit === '万元') return num * 10000;
+      if (unit === '%') return num / 100;
+      return num; // 元或其他直接返回
+    }
+
+    function normalizePercent(value) {
+      const num = parseFloat(value);
+      if (isNaN(num)) return 0;
+      return num / 100;
+    }
+
+    // 计算逻辑保持轻量：使用核心字段，其他字段先收集但暂不入算
+    document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+    document.getElementById('resetBtn').addEventListener('click', resetDefaults);
+
+    function runAnalysis() {
+      // 收集核心输入
+      const getVal = id => document.getElementById(id).value;
+      const hukou = getVal('hukou');
+      const familyType = getVal('familyType');
+      const multiChild = getVal('multiChild') === 'yes';
+      const ownedHouses = getVal('ownedHouses');
+      const socialYears = parseFloat(getVal('socialYears')) || 0;
+      const housePrice = normalizeAmount(getVal('housePrice'), '万元');
+      const area = parseFloat(getVal('area')) || 0;
+      const ring = getVal('ring');
+      const isNew = getVal('isNew') === 'yes';
+      const cash = normalizeAmount(getVal('cash'), '万元');
+      const stock = normalizeAmount(getVal('stock'), '万元');
+      const stockReturn = normalizePercent(getVal('stockReturn'));
+      const gjjBalance = normalizeAmount(getVal('gjjBalance'), '万元');
+      const gjjMonthly = normalizeAmount(getVal('gjjMonthly'), '万元');
+      const rent = normalizeAmount(getVal('rent'), '万元');
+      const rentGrowth = normalizePercent(getVal('rentGrowth'));
+      const years = parseInt(getVal('years'), 10) || 10;
+
+      // 普通住宅判定
+      let priceLimit = ring === 'inner' ? 7800000 : ring === 'middle' ? 6600000 : 4800000;
+      const isOrdinary = housePrice <= priceLimit && area <= 140;
+
+      // 资格校验
+      let qualified = true;
+      let disqualifyReason = '';
+      if (hukou === 'non-shanghai') {
+        if (ring !== 'outer' && socialYears < 3) { qualified = false; disqualifyReason = '非沪籍内/中环需连续社保满 3 年'; }
+        if (ring === 'outer' && socialYears < 1) { qualified = false; disqualifyReason = '非沪籍外环外需社保满 1 年'; }
+      }
+      if (familyType === 'single' && ring !== 'outer' && hukou === 'shanghai' && (ownedHouses === '1' || ownedHouses === '2+')) {
+        qualified = false; disqualifyReason = '沪籍单身内/中环限购 1 套';
+      }
+
+      const alertDiv = document.getElementById('policyAlert');
+      if (!qualified) {
+        alertDiv.className = 'alert error';
+        alertDiv.innerText = '购房资格不符：' + disqualifyReason;
+        alertDiv.style.display = 'block';
+        document.getElementById('result').style.display = 'none';
+        return;
+      } else {
+        alertDiv.className = 'alert success';
+        alertDiv.innerText = '符合上海购房资格';
+        alertDiv.style.display = 'block';
+      }
+
+      // 首付比例
+      const isFirstHome = ownedHouses === '0';
+      let downPaymentRate = 0.35;
+      if (isFirstHome) downPaymentRate = isOrdinary ? 0.20 : 0.35;
+      else if (ownedHouses === '1') downPaymentRate = isOrdinary ? 0.35 : 0.70;
+      else downPaymentRate = 0.70;
+
+      // 公积金额度
+      let gjjMax = familyType === 'single' ? 700000 : 1400000;
+      if (multiChild) gjjMax = 2160000;
+      const gjjLoanByBalance = gjjBalance * 40;
+      const totalLoanNeeded = housePrice * (1 - downPaymentRate);
+      const actualGjjLoan = Math.min(gjjMax, gjjLoanByBalance, totalLoanNeeded);
+      const commercialLoan = Math.max(0, totalLoanNeeded - actualGjjLoan);
+
+      const commercialRate = 0.035;
+      const gjjRate = isFirstHome ? 0.0285 : 0.03325;
+
+      function calcMonthlyPayment(principal, annualRate, yearsTerm) {
+        if (principal <= 0) return 0;
+        const r = annualRate / 12;
+        const n = yearsTerm * 12;
+        return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+      }
+
+      const gjjMonthlyPayment = calcMonthlyPayment(actualGjjLoan, gjjRate, 30);
+      const commercialMonthlyPayment = calcMonthlyPayment(commercialLoan, commercialRate, 30);
+      const totalMonthlyPayment = gjjMonthlyPayment + commercialMonthlyPayment;
+
+      // 税费与一次性成本（简化版，可由高级参数覆盖）
+      let deedTaxRate = 0.03;
+      if (isFirstHome) deedTaxRate = area <= 90 ? 0.01 : 0.015;
+      else if (ownedHouses === '1') deedTaxRate = area <= 90 ? 0.01 : 0.02;
+      const deedTax = housePrice * deedTaxRate;
+      const agentFee = housePrice * 0.02;
+      const maintenanceFund = area * 100;
+      const renovation = housePrice * 0.05;
+      const oneTimeCost = housePrice * downPaymentRate + deedTax + agentFee + maintenanceFund + renovation;
+
+      // 持有成本
+      const propertyFee = 5;
+      const annualProperty = propertyFee * area * 12;
+      const annualPropertyTax = 0; // 简化，详细由高级参数扩展
+      const annualHousingCost = totalMonthlyPayment * 12 + annualProperty + annualPropertyTax;
+
+      // 机会成本
+      const investable = cash + stock + gjjBalance;
+      const usedInOneTime = Math.min(investable, oneTimeCost);
+      const opportunityCost = usedInOneTime * (Math.pow(1 + stockReturn, years) - 1);
+      const housingCashOut = oneTimeCost + annualHousingCost * years;
+      const buyTotal = housingCashOut + opportunityCost;
+
+      // 租房总成本
+      let rentTotal = 0;
+      let rr = rent;
+      for (let i = 0; i < years; i++) {
+        rentTotal += rr * 12;
+        rr *= (1 + rentGrowth);
+      }
+
+      const diff = buyTotal - rentTotal;
+      const recommendation = diff > 0 ? '租房更省' : '购房更省';
+
+      const resultHTML = `
+        <div><strong>购房总成本（含机会成本）</strong>：${Math.round(buyTotal).toLocaleString()} 元</div>
+        <div><strong>租房总支出</strong>：${Math.round(rentTotal).toLocaleString()} 元</div>
+        <div><strong>差额</strong>：${Math.round(diff).toLocaleString()} 元（${recommendation}）</div>
+        <div class="muted" style="margin-top:6px;">当前计算使用核心 12 项，其他 151 项已保留默认值；如需精细化，请展开高级参数并再次计算。</div>
+      `;
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = resultHTML;
+      resultDiv.style.display = 'block';
+    }
+
+    function resetDefaults() {
+      coreParameters.forEach(p => {
+        const el = document.getElementById(p.id);
+        if (!el) return;
+        if (p.type === 'select') el.value = p.defaultValue;
+        else el.value = p.defaultValue;
+      });
+      parameterGroups.forEach(group => {
+        group.items.forEach(item => {
+          const el = document.getElementById(`adv-${item.id}-${item.key}`);
+          if (el) el.value = item.def;
+        });
+      });
+      document.getElementById('policyAlert').style.display = 'none';
+      document.getElementById('result').style.display = 'none';
+    }
+  </script>
 </body>
 </html>
