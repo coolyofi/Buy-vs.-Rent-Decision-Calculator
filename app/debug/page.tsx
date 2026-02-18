@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, Col, Divider, InputNumber, Row, Select, Space, Table, Tag, Typography } from "antd";
+import { Button, Card, Col, Divider, Input, InputNumber, Row, Select, Space, Switch, Table, Tag, Typography } from "antd";
 import rawSchema from "../../schema/model-schema.json";
 import { calculateModel, type ModelOutput } from "../../lib/calc";
 import { deriveEffectivePolicy } from "../../lib/policyProfiles";
@@ -238,6 +238,69 @@ export default function DebugPage() {
   }, [mergedInput, fieldByKey, result]);
 
   const active = moduleSummaries.find((x) => x.module.id === activeModuleId) ?? moduleSummaries[0];
+  const breakdownRows = useMemo(
+    () =>
+      BREAKDOWN_TO_MODULE.map((item) => {
+        const linkedModule = MODULES.find((m) => m.id === item.moduleId) ?? MODULES[0];
+        return {
+          key: item.name,
+          name: item.name,
+          value: item.value(result),
+          hint: item.hint,
+          moduleId: item.moduleId,
+          moduleName: linkedModule.name,
+          keys: linkedModule.keys,
+        };
+      }),
+    [result]
+  );
+
+  const renderFieldControl = (key: string) => {
+    const meta = fieldByKey.get(key);
+    const locked = POLICY_LOCKED_KEYS.includes(key);
+    const value = locked ? (lockedPolicy as Record<string, unknown>)[key] : mergedInput[key];
+
+    if (meta?.enum?.length) {
+      return (
+        <Select
+          style={{ width: "100%" }}
+          value={value as any}
+          disabled={locked}
+          options={meta.enum.map((x) => ({ label: String(x), value: x }))}
+          onChange={(next) => setInput((prev) => ({ ...prev, [key]: next }))}
+        />
+      );
+    }
+    if (meta?.type === "number") {
+      return (
+        <InputNumber
+          style={{ width: "100%" }}
+          value={typeof value === "number" ? value : toNumber(value)}
+          disabled={locked}
+          onChange={(next) => {
+            if (next === null || Number.isNaN(next)) return;
+            setInput((prev) => ({ ...prev, [key]: next }));
+          }}
+        />
+      );
+    }
+    if (meta?.type === "boolean" || typeof value === "boolean") {
+      return (
+        <Switch
+          checked={Boolean(value)}
+          disabled={locked}
+          onChange={(checked) => setInput((prev) => ({ ...prev, [key]: checked }))}
+        />
+      );
+    }
+    return (
+      <Input
+        value={value === undefined || value === null ? "" : String(value)}
+        disabled={locked}
+        onChange={(e) => setInput((prev) => ({ ...prev, [key]: e.target.value }))}
+      />
+    );
+  };
 
   return (
     <div style={{ padding: 20, maxWidth: 1500, margin: "0 auto" }}>
@@ -320,32 +383,11 @@ export default function DebugPage() {
                 {active.module.keys.map((key) => {
                   const meta = fieldByKey.get(key);
                   const locked = POLICY_LOCKED_KEYS.includes(key);
-                  const value = locked ? (lockedPolicy as Record<string, unknown>)[key] : mergedInput[key];
                   return (
                     <div key={key}>
                       <Text>{meta?.label ?? key}{meta?.unit ? `（${meta.unit}）` : ""}{locked ? "（自动应用）" : ""}</Text>
                       <div style={{ marginTop: 6 }}>
-                        {meta?.enum?.length ? (
-                          <Select
-                            style={{ width: "100%" }}
-                            value={value as any}
-                            disabled={locked}
-                            options={meta.enum.map((x) => ({ label: String(x), value: x }))}
-                            onChange={(next) => setInput((prev) => ({ ...prev, [key]: next }))}
-                          />
-                        ) : meta?.type === "number" ? (
-                          <InputNumber
-                            style={{ width: "100%" }}
-                            value={typeof value === "number" ? value : toNumber(value)}
-                            disabled={locked}
-                            onChange={(next) => {
-                              if (next === null || Number.isNaN(next)) return;
-                              setInput((prev) => ({ ...prev, [key]: next }));
-                            }}
-                          />
-                        ) : (
-                          <InputNumber style={{ width: "100%" }} disabled value={0} />
-                        )}
+                        {renderFieldControl(key)}
                       </div>
                       <Text type="secondary">参数键：{key}</Text>
                     </div>
@@ -363,6 +405,35 @@ export default function DebugPage() {
                     <li key={line}><Text>{line}</Text></li>
                   ))}
                 </ul>
+              </Card>
+
+              <Card title="总结果组成与模块映射" size="small">
+                <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  {breakdownRows.map((row) => (
+                    <Card
+                      key={row.key}
+                      size="small"
+                      hoverable
+                      onClick={() => setActiveModuleId(row.moduleId)}
+                      style={{ borderColor: active.module.id === row.moduleId ? "#1677ff" : undefined }}
+                    >
+                      <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                        <Row justify="space-between">
+                          <Text strong>{row.name}</Text>
+                          <Text>{row.name === "盈亏平衡点" ? `${row.value || "未出现"} 年` : `${fmtWan(row.value)}（${fmtYuan(row.value)}）`}</Text>
+                        </Row>
+                        <Text type="secondary">{row.hint}</Text>
+                        <div>
+                          <Tag color="blue">{row.moduleName}</Tag>
+                          {row.keys.slice(0, 6).map((k) => (
+                            <Tag key={k}>{fieldByKey.get(k)?.label ?? k}</Tag>
+                          ))}
+                          {row.keys.length > 6 ? <Tag>...</Tag> : null}
+                        </div>
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
               </Card>
 
               <Card title="参数变化对结果的影响（当前模块）" size="small">
