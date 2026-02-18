@@ -1,0 +1,42 @@
+
+> buy-vs-rent-calculator@0.1.0 dev
+> next dev --port 4002
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:4002
+
+ ✓ Starting...
+ ✓ Ready in 6s
+ ○ Compiling / ...
+ ✓ Compiled / in 44.2s (6868 modules)
+Warning: [antd: Tabs] `Tabs.TabPane` is deprecated. Please use `items` instead.
+ HEAD / 200 in 45572ms
+ ✓ Compiled in 3.3s (6868 modules)
+ ✓ Compiled in 3s (6868 modules)
+ ✓ Compiled in 2.3s (6868 modules)
+ ✓ Compiled in 728ms (3436 modules)
+ ✓ Compiled in 512ms (3436 modules)
+ ✓ Compiled in 342ms (3436 modules)
+ ✓ Compiled in 3.3s (3436 modules)
+ ✓ Compiled in 489ms (3436 modules)
+ ⨯ ./app/page.tsx
+Error: 
+  [31mx[0m Unexpected eof
+     ,-[[36;1;4m/workspaces/Buy-vs.-Rent-Decision-Calculator/app/page.tsx[0m:113:1]
+ [2m113[0m |       </Row>
+ [2m114[0m |     </div>
+ [2m115[0m |   );
+ [2m116[0m | }
+     : [31;1m ^[0m
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/page.tsx
+ ✓ Compiled in 1842ms (3436 modules)
+ ✓ Compiled in 2.4s (3436 modules)
+ ✓ Compiled in 479ms (3436 modules)
+ ✓ Compiled in 3.4s (3436 modules)
+[?25h

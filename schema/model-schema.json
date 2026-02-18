@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shanghai Buy vs Rent 163-parameter schema",
+  "version": "0.1.0",
+  "currencyDefaultUnit": "万元",
+  "percentConvention": "percent values expressed as 0-100; runtime will convert to decimal where needed",
+  "groups": [
+    {
+      "name": "一 取得成本",
+      "items": [
+        {"id":1, "key":"P", "label":"合同网签价", "type":"number", "unit":"万元", "default":600, "desc":"交易基准价，影响全部税费与首付", "core":true},
+        {"id":175, "key":"area", "label":"房屋面积", "type":"number", "unit":"㎡", "default":90, "desc":"房屋建筑面积", "core":true},
+        {"id":176, "key":"ring", "label":"环线位置", "type":"string", "enum":["inner","middle","outer"], "default":"middle", "desc":"内环内/中环内/外环外", "core":true},
+        {"id":177, "key":"years", "label":"持有年限", "type":"number", "unit":"年", "default":10, "desc":"计划持有或模拟对比的时间段", "core":true},
+        {"id":2, "key":"P_eval", "label":"贷款评估价", "type":"number", "unit":"万元", "default":570, "desc":"银行评估价，低于网签会抬升首付"},
+        {"id":3, "key":"VAT_rate", "label":"增值税税率", "type":"number", "unit":"%", "default":0, "desc":"满2年普通免征，未满按5%简化"},
+        {"id":4, "key":"CT_rate", "label":"城市维护建设税率", "type":"number", "unit":"%", "default":7, "desc":"增值税附加 7%"},
+        {"id":5, "key":"Edu_rate", "label":"教育附加", "type":"number", "unit":"%", "default":3, "desc":"增值税附加 3%"},
+        {"id":6, "key":"LocalEdu_rate", "label":"地方教育附加", "type":"number", "unit":"%", "default":2, "desc":"增值税附加 2%"},
+        {"id":7, "key":"Deed1_rate", "label":"契税首套", "type":"number", "unit":"%", "default":1.5, "desc":"90㎡以下1%，以上1.5%"},
+        {"id":8, "key":"Deed2_rate", "label":"契税二套", "type":"number", "unit":"%", "default":2, "desc":"90㎡以下1%，以上2%"},
+        {"id":9, "key":"PIT_gross_rate", "label":"个税核定", "type":"number", "unit":"%", "default":1.5, "desc":"按总价1-2%核定"},
+        {"id":10, "key":"PIT_gain_rate", "label":"个税差额", "type":"number", "unit":"%", "default":20, "desc":"按增值额20%"},
+        {"id":11, "key":"M5U", "label":"满五唯一", "type":"string", "enum":["yes","no"], "default":"yes", "desc":"决定个税是否免征"},
+        {"id":12, "key":"Buyer_agent_rate", "label":"买方中介费率", "type":"number", "unit":"%", "default":1.5, "desc":"常见1%-2%"},
+        {"id":13, "key":"Seller_to_buyer_rate", "label":"卖方佣金转嫁", "type":"number", "unit":"%", "default":0.5, "desc":"卖方费用转嫁给买方部分"},
+        {"id":14, "key":"Reg_fee", "label":"登记费", "type":"number", "unit":"万元", "default":0.1, "desc":"权属登记固定费用"},
+        {"id":15, "key":"Stamp_rate", "label":"印花税", "type":"number", "unit":"%", "default":0, "desc":"住宅免征，非住宅0.05%"},
+        {"id":16, "key":"Land_fee", "label":"土地收益金", "type":"number", "unit":"万元", "default":0, "desc":"公房/房改房需考虑"},
+        {"id":17, "key":"Reno_hard", "label":"硬装预算", "type":"number", "unit":"万元", "default":30, "desc":"建议按房价5%"},
+        {"id":18, "key":"Reno_soft", "label":"软装家电", "type":"number", "unit":"万元", "default":12, "desc":"建议按房价2%"},
+        {"id":19, "key":"Parking_upfront", "label":"车位首款", "type":"number", "unit":"万元", "default":0, "desc":"购买或认购车位首付"},
+        {"id":20, "key":"PM_deposit", "label":"前期物业押金", "type":"number", "unit":"万元", "default":0.5, "desc":"交房阶段缴纳"}
+      ]
+    },
+    {
+      "name": "二 贷款与现金流",
+      "items": [
+        {"id":21, "key":"dp_min", "label":"首付下限", "type":"number", "unit":"%", "default":20, "desc":"按套数与普通/非普通确定", "core":true},
+        {"id":22, "key":"LPR", "label":"商贷基准利率", "type":"number", "unit":"%", "default":3.5, "desc":"LPR 基础"},
+        {"id":23, "key":"BP", "label":"银行加点", "type":"number", "unit":"BP", "default":0, "desc":"相对 LPR 加点"},
+        {"id":24, "key":"r_gjj", "label":"公积金利率", "type":"number", "unit":"%", "default":2.85, "desc":"首套2.85%，二套3.325%"},
+        {"id":25, "key":"Mix_ratio", "label":"组合贷占比", "type":"number", "unit":"%", "default":50, "desc":"公积金占总贷比例"},
+        {"id":26, "key":"n_years", "label":"还款周期", "type":"number", "unit":"年", "default":30, "desc":"20或30年"},
+        {"id":27, "key":"Repay_type", "label":"还款方式", "type":"string", "enum":["等额本息","等额本金"], "default":"等额本息", "desc":"还款方式"},
+        {"id":28, "key":"DTI", "label":"月供收入比", "type":"number", "unit":"%", "default":0, "desc":"输出指标，建议<40%"},
+        {"id":29, "key":"Prepay_fee_rate", "label":"提前还贷违约金", "type":"number", "unit":"%", "default":2, "desc":"按剩余本金或若干期利息"},
+        {"id":30, "key":"GJJ_offset", "label":"公积金月冲还贷", "type":"number", "unit":"元", "default":0, "desc":"抵扣月供现金流"},
+        {"id":31, "key":"GJJ_extra", "label":"公积金补充缴存", "type":"number", "unit":"元", "default":0, "desc":"补充账户缴存额"},
+        {"id":32, "key":"Loan_service", "label":"贷款服务费", "type":"number", "unit":"万元", "default":0.1, "desc":"评估/服务费用"},
+        {"id":33, "key":"Reprice_cycle", "label":"利率重定价周期", "type":"number", "unit":"月", "default":12, "desc":"LPR 更新周期"},
+        {"id":34, "key":"Deduct_limit", "label":"房贷利息个税抵扣", "type":"number", "unit":"元/月", "default":1000, "desc":"专项附加扣除"},
+        {"id":35, "key":"Grace_months", "label":"宽限期", "type":"number", "unit":"月", "default":0, "desc":"只还息不还本期限"}
+      ]
+    },
+    {
+      "name": "三 持有期运营",
+      "items": [
+        {"id":36, "key":"PM_unit", "label":"物业费单价", "type":"number", "unit":"元/㎡/月", "default":5, "desc":"基础物业费"},
+        {"id":37, "key":"PM_growth", "label":"物业费调增率", "type":"number", "unit":"%", "default":3, "desc":"年度增长率"},
+        {"id":38, "key":"Exempt_area_percap", "label":"房产税免征面积/人", "type":"number", "unit":"㎡", "default":60, "desc":"上海试行标准"},
+        {"id":39, "key":"PropertyTax_rate", "label":"房产税率", "type":"number", "unit":"%", "default":0.4, "desc":"0.4%或0.6%"},
+        {"id":40, "key":"Maintenance_yearly", "label":"年度维护费", "type":"number", "unit":"元/㎡/年", "default":30, "desc":"墙面、防水等"},
+        {"id":41, "key":"Large_replace", "label":"大型设备更换", "type":"number", "unit":"万元", "default":2, "desc":"第10年电梯/空调"},
+        {"id":42, "key":"Fund_supp", "label":"大修基金补缴", "type":"number", "unit":"万元", "default":0, "desc":"补缴或追加"},
+        {"id":43, "key":"Parking_mgmt", "label":"车位管理费", "type":"number", "unit":"元/月", "default":0, "desc":"地库车位管理"},
+        {"id":44, "key":"Broadband", "label":"宽带电视", "type":"number", "unit":"元/月", "default":120, "desc":"通信费用"},
+        {"id":45, "key":"Energy_premium", "label":"能耗溢价", "type":"number", "unit":"元/月", "default":0, "desc":"大面积能耗"},
+        {"id":46, "key":"Insurance", "label":"财产保险", "type":"number", "unit":"元/年", "default":800, "desc":"房屋及财产险"},
+        {"id":47, "key":"Vacancy", "label":"空置期成本", "type":"number", "unit":"元/月", "default":0, "desc":"出租闲置成本"}
+      ]
+    },
+    {
+      "name": "四 租房端特有",
+      "items": [
+        {"id":48, "key":"rent_0", "label":"初始月租", "type":"number", "unit":"元", "default":8000, "desc":"租房基准", "core":true},
+        {"id":49, "key":"Deposit_mult", "label":"押金倍数", "type":"number", "unit":"倍", "default":1.25, "desc":"押一付三=1+3/12"},
+        {"id":50, "key":"g_r", "label":"租金涨幅", "type":"number", "unit":"%", "default":3, "desc":"年化增长率"},
+        {"id":51, "key":"Rent_agent_rate", "label":"租房中介费率", "type":"number", "unit":"月租", "default":0.5, "desc":"半个月租金"},
+        {"id":52, "key":"Move_freq_years", "label":"换房频率", "type":"number", "unit":"年/次", "default":2, "desc":"平均换租周期"},
+        {"id":53, "key":"Move_cost", "label":"搬家费", "type":"number", "unit":"元/次", "default":3000, "desc":"搬迁物流"},
+        {"id":54, "key":"Furn_depr", "label":"家具折旧", "type":"number", "unit":"元/次", "default":2000, "desc":"非拎包入住投入"},
+        {"id":55, "key":"Residence_fee", "label":"居住证办理", "type":"number", "unit":"元/年", "default":0, "desc":"按需填写"},
+        {"id":56, "key":"Rent_tax_rate", "label":"租房开票税率", "type":"number", "unit":"%", "default":1, "desc":"若需发票"},
+        {"id":57, "key":"GJJ_rent_cap", "label":"公积金付租上限", "type":"number", "unit":"元/月", "default":0, "desc":"可提取额度"},
+        {"id":58, "key":"Commute_delta", "label":"通勤成本差额", "type":"number", "unit":"元/月", "default":0, "desc":"通勤成本差"},
+        {"id":59, "key":"Overlap_rent", "label":"叠租成本", "type":"number", "unit":"元/次", "default":0, "desc":"换租重叠租金"},
+        {"id":60, "key":"Social_cost", "label":"社交环境重建", "type":"number", "unit":"元/次", "default":0, "desc":"生活圈重建成本"}
+      ]
+    },
+    {
+      "name": "五 机会成本与再投资",
+      "items": [
+        {"id":61, "key":"R_inv", "label":"初始资金收益率", "type":"number", "unit":"%", "default":5, "desc":"无房投资收益假设"},
+        {"id":62, "key":"R_delta", "label":"月供差额收益率", "type":"number", "unit":"%", "default":5, "desc":"租金与月供差额再投资"},
+        {"id":63, "key":"R_taxsave", "label":"税费节省收益率", "type":"number", "unit":"%", "default":5, "desc":"节省税费再投资"},
+        {"id":64, "key":"Liquidity_premium", "label":"流动性溢价", "type":"number", "unit":"折现", "default":1, "desc":"保持流动性价值折现"},
+        {"id":65, "key":"Dividend_reinvest", "label":"分红再投资率", "type":"number", "unit":"%", "default":100, "desc":"分红继续投资比例"},
+        {"id":66, "key":"Invest_fee_rate", "label":"投资管理费", "type":"number", "unit":"%", "default":0.2, "desc":"账户管理费"},
+        {"id":67, "key":"CPI", "label":"通胀率", "type":"number", "unit":"%", "default":2, "desc":"实际收益需扣通胀"},
+        {"id":68, "key":"FX_dep", "label":"货币贬值预期", "type":"number", "unit":"%", "default":0, "desc":"跨币种/通胀风险"},
+        {"id":69, "key":"Beta", "label":"风险系数", "type":"number", "unit":"无量纲", "default":1, "desc":"组合波动折现"},
+        {"id":70, "key":"Emergency", "label":"紧急备用金", "type":"number", "unit":"万元", "default":6, "desc":"覆盖6个月支出"}
+      ]
+    },
+    {
+      "name": "六 退出与残值",
+      "items": [
+        {"id":71, "key":"g_p", "label":"房价年化增长", "type":"number", "unit":"%", "default":3, "desc":"长期房价增速"},
+        {"id":72, "key":"Seller_tax_rate", "label":"卖方个税", "type":"number", "unit":"%", "default":0, "desc":"满五唯一0，否则增值20%"},
+        {"id":73, "key":"Seller_agent_rate", "label":"卖方中介费率", "type":"number", "unit":"%", "default":2, "desc":"卖方佣金"},
+        {"id":74, "key":"VAT_addon_exit", "label":"退出增值税附加", "type":"number", "unit":"%", "default":0, "desc":"与取得期规则一致"},
+        {"id":75, "key":"Bal_remain", "label":"卖出时剩余本金", "type":"number", "unit":"万元", "default":0, "desc":"由摊还表决定"},
+        {"id":76, "key":"Depreciation_rate", "label":"成新折损", "type":"number", "unit":"%", "default":10, "desc":"成新折旧率"},
+        {"id":77, "key":"Land_renew", "label":"土地续期费", "type":"number", "unit":"万元", "default":0, "desc":"70年续期成本"},
+        {"id":78, "key":"Time_cost", "label":"卖房时间成本", "type":"number", "unit":"万元", "default":0.1, "desc":"售房周期时间成本"},
+        {"id":79, "key":"Escrow_fee", "label":"资金监管费", "type":"number", "unit":"万元", "default":0.05, "desc":"交易监管账户"},
+        {"id":80, "key":"Transfer_fee", "label":"回流手续费", "type":"number", "unit":"万元", "default":0, "desc":"大额划转成本"}
+      ]
+    },
+    {
+      "name": "七 宏观与社会价值",
+      "items": [
+        {"id":81, "key":"School_premium", "label":"学区溢价", "type":"number", "unit":"万元", "default":0, "desc":"学区带来的溢价"},
+        {"id":82, "key":"Medical_weight", "label":"医疗配套权重", "type":"number", "unit":"0-1", "default":0.5, "desc":"医疗资源权重"},
+        {"id":83, "key":"Metro_premium", "label":"轨交溢价", "type":"number", "unit":"万元", "default":0, "desc":"地铁影响溢价"},
+        {"id":84, "key":"Hukou_weight", "label":"落户积分权重", "type":"number", "unit":"0-1", "default":0.5, "desc":"购房对落户的加成"},
+        {"id":85, "key":"Rent_right_weight", "label":"租购同权成熟度", "type":"number", "unit":"0-1", "default":0.5, "desc":"租房入学权保障"},
+        {"id":86, "key":"Pop_growth", "label":"人口流入预测", "type":"number", "unit":"%", "default":1, "desc":"人口支撑房价"},
+        {"id":87, "key":"Plan_realize", "label":"区域规划兑现率", "type":"number", "unit":"0-1", "default":0.6, "desc":"规划落地概率"},
+        {"id":88, "key":"Climate_score", "label":"气候适应性", "type":"number", "unit":"0-1", "default":0.5, "desc":"湿热/噪音/采光"},
+        {"id":89, "key":"Peace_discount", "label":"心理安稳折现", "type":"number", "unit":"0-1", "default":0.95, "desc":"自有房效用加成"},
+        {"id":90, "key":"Freedom_score", "label":"主权决策权", "type":"number", "unit":"0-1", "default":0.5, "desc":"装修/宠物自由"}
+      ]
+    },
+    {
+      "name": "八 生命周期与突发",
+      "items": [
+        {"id":91, "key":"Career_years", "label":"职业剩余年限", "type":"number", "unit":"年", "default":20, "desc":"未来收入稳定性"},
+        {"id":92, "key":"g_salary", "label":"薪资增长", "type":"number", "unit":"%", "default":3, "desc":"收入提升"},
+        {"id":93, "key":"Kids_change", "label":"子女数量变化", "type":"number", "unit":"人", "default":0, "desc":"房间需求"},
+        {"id":94, "key":"Medical_future", "label":"家庭医疗支出", "type":"number", "unit":"元/年", "default":0, "desc":"长期医疗成本"},
+        {"id":95, "key":"Estate_tax_rate", "label":"遗产税预期", "type":"number", "unit":"%", "default":0, "desc":"资产传承税率"},
+        {"id":96, "key":"Divorce_prob", "label":"婚姻变动风险", "type":"number", "unit":"概率", "default":0, "desc":"财产分割风险"},
+        {"id":97, "key":"Gap_secondary", "label":"二套资格间隔", "type":"number", "unit":"年", "default":0, "desc":"卖首套后再买二套等待期"},
+        {"id":98, "key":"Policy_vol", "label":"政策变动频率", "type":"string", "default":"中", "desc":"限购松绑/收紧节奏"},
+        {"id":99, "key":"Neighborhood_score", "label":"邻里稳定性", "type":"number", "unit":"0-1", "default":0.6, "desc":"社区圈层稳定度"},
+        {"id":100, "key":"Tail_risk_prob", "label":"极端风险概率", "type":"number", "unit":"概率", "default":0.05, "desc":"收入中断/房价下跌概率"}
+      ]
+    },
+    {
+      "name": "九 资金结构与现金流安全",
+      "items": [
+        {"id":101, "key":"Liquid_ratio", "label":"流动现金占比", "type":"number", "unit":"%", "default":20, "desc":"建议>=20%"},
+        {"id":102, "key":"Cash_runway_months", "label":"可动用现金月数", "type":"number", "unit":"月", "default":6, "desc":"失业可支撑时间"},
+        {"id":103, "key":"Credit_util", "label":"信用额度利用率", "type":"number", "unit":"%", "default":30, "desc":"备用信贷占比"},
+        {"id":104, "key":"Income_concentration", "label":"收入集中度", "type":"number", "unit":"无量纲", "default":1, "desc":"单一工资=1，多收入<1"},
+        {"id":105, "key":"Bonus_vol", "label":"奖金波动系数", "type":"number", "unit":"无量纲", "default":0.5, "desc":"奖金不稳定程度"},
+        {"id":106, "key":"Unemployed_months", "label":"失业现金流月数", "type":"number", "unit":"月", "default":6, "desc":"可持续月份"},
+        {"id":107, "key":"Mortgage_to_debt", "label":"房贷/总负债", "type":"number", "unit":"%", "default":70, "desc":"杠杆安全阈值"},
+        {"id":108, "key":"Fixed_burden", "label":"固定支出刚性指数", "type":"number", "unit":"无量纲", "default":0.6, "desc":"房贷+家庭固定支出"},
+        {"id":109, "key":"DTI_stress", "label":"收入下降20%压力DTI", "type":"number", "unit":"%", "default":0, "desc":"输出指标"},
+        {"id":110, "key":"Career_switch_cost", "label":"职业转换成本", "type":"number", "unit":"万元", "default":0.5, "desc":"跨行业/转岗成本"},
+        {"id":111, "key":"Parent_med", "label":"父母医疗支出", "type":"number", "unit":"元/年", "default":0, "desc":"潜在长期支出"},
+        {"id":112, "key":"Family_support", "label":"家庭支持持续性", "type":"number", "unit":"万元/年", "default":0, "desc":"来自或给予家庭的现金流"},
+        {"id":113, "key":"Future_big", "label":"未来大额支出", "type":"number", "unit":"万元", "default":0, "desc":"换车/教育等"},
+        {"id":114, "key":"Cash_to_real", "label":"现金 vs 不动产比例", "type":"number", "unit":"%", "default":30, "desc":"资产流动性"},
+        {"id":115, "key":"Anxiety_threshold", "label":"心理焦虑阈值", "type":"number", "unit":"月供/收入", "default":0.5, "desc":"超过该比率易焦虑"}
+      ]
+    },
+    {
+      "name": "十 公积金真实变量",
+      "items": [
+        {"id":116, "key":"GJJ_growth", "label":"公积金账户增长率", "type":"number", "unit":"%", "default":5, "desc":"缴存+利息年化"},
+        {"id":117, "key":"GJJ_policy_risk", "label":"公积金提取政策风险", "type":"number", "unit":"0-1", "default":0.3, "desc":"收紧概率"},
+        {"id":118, "key":"GJJ_drop_prob", "label":"换工作缴存下降概率", "type":"number", "unit":"概率", "default":0.2, "desc":"断缴或降缴风险"},
+        {"id":119, "key":"GJJ_offset_priority", "label":"冲还贷优先级", "type":"string", "default":"高", "desc":"优先冲抵月供或保留收益"},
+        {"id":120, "key":"GJJ_cap_change", "label":"贷款额度政策变化", "type":"number", "unit":"万元", "default":0, "desc":"未来额度调整"},
+        {"id":121, "key":"GJJ_merge", "label":"双人合并可能性", "type":"string", "enum":["yes","no"], "default":"yes", "desc":"夫妻合并贷"},
+        {"id":122, "key":"GJJ_transfer_cost", "label":"异地转移成本", "type":"number", "unit":"万元", "default":0, "desc":"转入上海成本"},
+        {"id":123, "key":"GJJ_gap_penalty", "label":"断缴资格影响", "type":"number", "unit":"月", "default":12, "desc":"断缴影响贷款的月数"},
+        {"id":124, "key":"GJJ_oc", "label":"余额机会成本", "type":"number", "unit":"折现", "default":0, "desc":"余额不用作投资的代价"},
+        {"id":125, "key":"GJJ_prepay_vs_keep", "label":"公积金提前还贷差额", "type":"number", "unit":"输出", "default":0, "desc":"提前还贷与留存收益对比"},
+        {"id":164, "key":"GJJ_max_single", "label":"公积金额度上限（单人）", "type":"number", "unit":"万元", "default":70, "desc":"单人公积金贷款上限（FE 中 gjjMax 对应，单位：万元）"},
+        {"id":165, "key":"GJJ_max_family", "label":"公积金额度上限（家庭/夫妻）", "type":"number", "unit":"万元", "default":140, "desc":"夫妻合并贷或家庭额度上限（万元）"},
+        {"id":166, "key":"GJJ_max_multichild", "label":"公积金额度上限（多子女）", "type":"number", "unit":"万元", "default":216, "desc":"多子女/政策加成时的上限（万元）"},
+        {"id":167, "key":"GJJ_balance_multiplier", "label":"公积金余额倍数", "type":"number", "unit":"倍", "default":40, "desc":"用于计算可贷额度：余额×倍数"}
+      ]
+    },
+    {
+      "name": "十一 投资端行为",
+      "items": [
+        {"id":126, "key":"Invest_consistency", "label":"投资执行一致性", "type":"number", "unit":"0-1", "default":0.7, "desc":"计划与实际一致度"},
+        {"id":127, "key":"DCA_prob", "label":"下跌定投概率", "type":"number", "unit":"概率", "default":0.6, "desc":"下跌时坚持定投的概率"},
+        {"id":128, "key":"Risk_aversion", "label":"风险厌恶系数", "type":"number", "unit":"无量纲", "default":1, "desc":"越高越保守"},
+        {"id":129, "key":"Drawdown_tol", "label":"回撤容忍度", "type":"number", "unit":"%", "default":20, "desc":"可接受最大回撤"},
+        {"id":130, "key":"Rebalance_freq", "label":"再平衡频率", "type":"string", "default":"年度", "desc":"资产配置再平衡节奏"},
+        {"id":131, "key":"R_after_tax", "label":"税后实际收益率", "type":"number", "unit":"%", "default":4.5, "desc":"扣税后的收益"},
+        {"id":132, "key":"Recovery_years", "label":"黑天鹅恢复周期", "type":"number", "unit":"年", "default":3, "desc":"大跌后回本时间"},
+        {"id":133, "key":"Discipline_discount", "label":"持仓纪律折现", "type":"number", "unit":"折现", "default":0.9, "desc":"执行偏差折损"},
+        {"id":134, "key":"Mistake_prob", "label":"误操作概率", "type":"number", "unit":"概率", "default":0.02, "desc":"操作失误导致损失"},
+        {"id":135, "key":"Invest_time", "label":"投资时间成本", "type":"number", "unit":"小时/月", "default":2, "desc":"管理投资所需时间"},
+        {"id":136, "key":"Emotional_loss_rate", "label":"情绪交易损失率", "type":"number", "unit":"%", "default":1, "desc":"情绪化交易损耗"},
+        {"id":137, "key":"Early_use_prob", "label":"资金被迫提前使用概率", "type":"number", "unit":"概率", "default":0.1, "desc":"突发动用投资概率"}
+      ]
+    },
+    {
+      "name": "十二 租房隐藏成本",
+      "items": [
+        {"id":138, "key":"Landlord_risk", "label":"房东提前收回风险", "type":"number", "unit":"概率", "default":0.1, "desc":"解约或出售风险"},
+        {"id":139, "key":"Rent_reno_risk", "label":"装修质量不可控成本", "type":"number", "unit":"元/年", "default":0, "desc":"居住体验损耗"},
+        {"id":140, "key":"Leave_loss", "label":"搬迁休假时间损失", "type":"number", "unit":"元/次", "default":0, "desc":"请假搬家损失"},
+        {"id":141, "key":"Negotiate_fail", "label":"租约谈判失败风险", "type":"number", "unit":"概率", "default":0.1, "desc":"续租失败概率"},
+        {"id":142, "key":"Upgrade_prob", "label":"被迫升级租金档位概率", "type":"number", "unit":"概率", "default":0.1, "desc":"租金上涨超预期"},
+        {"id":143, "key":"Mismatch_loss", "label":"家具不匹配损耗", "type":"number", "unit":"元/次", "default":0, "desc":"家具尺寸/风格不匹配"},
+        {"id":144, "key":"Restriction_cost", "label":"宠物改造限制成本", "type":"number", "unit":"元/年", "default":0, "desc":"限制带来的替代成本"},
+        {"id":145, "key":"Rent_stability_discount", "label":"租房稳定性折现", "type":"number", "unit":"折现", "default":0.95, "desc":"租房效用折现"},
+        {"id":146, "key":"Rent_vs_salary_gap", "label":"租金涨幅与工资差", "type":"number", "unit":"输出", "default":0, "desc":"租金增速减工资增速"},
+        {"id":147, "key":"Social_capital_loss", "label":"社交资本损耗", "type":"number", "unit":"元/次", "default":0, "desc":"迁居社交损失"}
+      ]
+    },
+    {
+      "name": "十三 物理生命周期",
+      "items": [
+        {"id":148, "key":"Structure_stage", "label":"结构寿命阶段", "type":"string", "default":"10-20", "desc":"0-10/10-20/20+年"},
+        {"id":149, "key":"Age_discount", "label":"楼龄折价", "type":"number", "unit":"%/年", "default":0.5, "desc":"10年后每年折价"},
+        {"id":150, "key":"Elevator_cycle", "label":"电梯维护周期", "type":"number", "unit":"年", "default":10, "desc":"电梯/大修周期"},
+        {"id":151, "key":"Pipe_prob", "label":"管线老化概率", "type":"number", "unit":"概率/年", "default":0.05, "desc":"水电气老化风险"},
+        {"id":152, "key":"Redev_prob", "label":"旧改可能性", "type":"number", "unit":"概率", "default":0.1, "desc":"旧改溢价或干扰"},
+        {"id":153, "key":"Energy_upgrade", "label":"能耗标准升级成本", "type":"number", "unit":"万元", "default":0, "desc":"节能改造成本"},
+        {"id":154, "key":"Light_noise_discount", "label":"采光噪音折现", "type":"number", "unit":"%", "default":2, "desc":"朝向/噪音折扣"},
+        {"id":155, "key":"PM_quality_prob", "label":"物业质量变化概率", "type":"number", "unit":"概率", "default":0.1, "desc":"物业更替变化"}
+      ]
+    },
+    {
+      "name": "十四 政策与制度不确定性",
+      "items": [
+        {"id":156, "key":"RE_tax_prob", "label":"房地产税推行概率", "type":"number", "unit":"概率", "default":0.2, "desc":"房产税落地概率"},
+        {"id":157, "key":"LQ_relax_prob", "label":"限购松绑概率", "type":"number", "unit":"概率", "default":0.2, "desc":"放松限购可能"},
+        {"id":158, "key":"Shift_rate", "label":"房贷利率中枢变化", "type":"number", "unit":"%", "default":0, "desc":"长期利率趋势调整"},
+        {"id":159, "key":"Rent_market_maturity", "label":"租赁市场成熟度", "type":"number", "unit":"0-1", "default":0.5, "desc":"制度完善度"},
+        {"id":160, "key":"Aging_impact", "label":"人口老龄化影响", "type":"number", "unit":"折减", "default":0.1, "desc":"对住房需求折减"},
+        {"id":161, "key":"Industry_move_prob", "label":"产业迁移风险", "type":"number", "unit":"概率", "default":0.1, "desc":"产业外迁对房价影响"},
+        {"id":162, "key":"Supply_shift", "label":"供应结构变化", "type":"number", "unit":"折减", "default":0, "desc":"新增供应压制价格"},
+        {"id":163, "key":"Public_house_competition", "label":"公共住房竞争", "type":"number", "unit":"折减", "default":0.05, "desc":"保障房对市场房影响"}
+      ]
+    },
+    {
+      "name": "十五 系统常量与政策阈值",
+      "items": [
+        {"id":168, "key":"price_limit_inner", "label":"内环价格上限", "type":"number", "unit":"万元", "default":780, "desc":"用于判定普通住宅价格上限（FE 的 priceLimit）"},
+        {"id":169, "key":"price_limit_middle", "label":"中环价格上限", "type":"number", "unit":"万元", "default":660, "desc":"用于判定普通住宅价格上限"},
+        {"id":170, "key":"price_limit_outer", "label":"外环价格上限", "type":"number", "unit":"万元", "default":480, "desc":"用于判定普通住宅价格上限"},
+        {"id":171, "key":"ordinary_area_limit", "label":"普通住宅面积上限", "type":"number", "unit":"㎡", "default":140, "desc":"判断是否为普通住宅的面积阈值（FE 用到的 140㎡）"},
+        {"id":172, "key":"maintenance_oneoff_per_sqm", "label":"一次性维护费/㎡", "type":"number", "unit":"元/㎡", "default":100, "desc":"购房一次性维护/整修预算（FE 使用 area * 100）"},
+        {"id":173, "key":"reno_pct_default", "label":"装修占房价比例（硬装）", "type":"number", "unit":"%", "default":5, "desc":"默认硬装按房价百分比估算（FE 使用 5%）"},
+        {"id":174, "key":"deed_tax_fallback_rate", "label":"契税默认率（兜底）", "type":"number", "unit":"%", "default":3, "desc":"当契税规则无法匹配时使用的默认契税率"}
+      ]
+    }
+  ]
+}

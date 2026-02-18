@@ -1,0 +1,35 @@
+{
+  "name": "buy-vs-rent-calculator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@formily/antd-v5": "^1.2.2",
+    "@formily/core": "^2.3.2",
+    "@formily/json-schema": "^2.3.2",
+    "@formily/react": "^2.3.2",
+    "@formily/reactive-react": "^2.3.2",
+    "@supabase/supabase-js": "^2.39.7",
+    "ajv": "^8.12.0",
+    "antd": "^5.24.1",
+    "lucide-react": "^0.331.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "swr": "^2.3.0",
+    "zustand": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.16",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^4.1.1",
+    "eslint-config-next": "^16.1.6",
+    "typescript": "^5.7.3"
+  }
+}
