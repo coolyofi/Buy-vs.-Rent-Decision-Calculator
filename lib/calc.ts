@@ -348,9 +348,22 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
   for (let y = 0; y < years; y++) {
     holdingExtraTotalWan += (baseAnnualHoldingYuan * Math.pow(1 + pmGrowth, y)) / 10000;
   }
-  const yearlyOutflowWan = (monthlyCashOutYuan * 12) / 10000;
-  const buyCashOutWan = oneTimeCostWan + yearlyOutflowWan * years + holdingExtraTotalWan + largeReplaceWan;
-  const capitalLockedWan = downPaymentWan;
+  const yearlyOutflowWan = (monthlyCashOutYuan * 12) / 10000; // 仅等额本息精确；等额本金月供递减，总成本另行计算
+
+  // 等额本金月供逐月递减，必须用真实摊销累计计算总还款额；等额本息结果与 month1×N 一致
+  const gjjAmortFull = amortization(L_gjj, rGjj, termMonths, years * 12, repayType);
+  const comAmortFull = amortization(L_com, lpr, termMonths, years * 12, repayType);
+  const totalMortgagePaymentsWan =
+    gjjAmortFull.principalPaidWan + gjjAmortFull.interestPaidWan +
+    comAmortFull.principalPaidWan + comAmortFull.interestPaidWan;
+  const totalOffsetWan = (gjjOffsetYuan + mortgageTaxSavingYuan) * 12 * years / 10000;
+  const totalMonthlyHoldingWan = monthlyHoldingYuan * 12 * years / 10000;
+  const buyCashOutWan = oneTimeCostWan +
+    Math.max(0, totalMortgagePaymentsWan - totalOffsetWan + totalMonthlyHoldingWan) +
+    holdingExtraTotalWan + largeReplaceWan;
+
+  // 机会成本基于全部前期资本（首付 + 税费 + 装修 + 摩擦），而非仅首付
+  const capitalLockedWan = oneTimeCostWan;
   const opportunityCostWan = capitalLockedWan * (Math.pow(1 + rInv, years) - 1);
   const buyTotalWan = buyCashOutWan + opportunityCostWan;
 
@@ -530,8 +543,9 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
 
   let breakEvenGrowth = debugFast ? gHouse : 0.08;
 
-  const increase50bp = pmtWan(L_gjj, rGjj + 0.005, termMonths) + pmtWan(L_com, lpr + 0.005, termMonths);
-  const increase100bp = pmtWan(L_gjj, rGjj + 0.01, termMonths) + pmtWan(L_com, lpr + 0.01, termMonths);
+  // 压力测试需与当前还款方式保持一致；等额本金第1期月供最高，用第1月衡量冲击最保守
+  const increase50bp = paymentAtMonthWan(L_gjj, rGjj + 0.005, termMonths, 1, repayType) + paymentAtMonthWan(L_com, lpr + 0.005, termMonths, 1, repayType);
+  const increase100bp = paymentAtMonthWan(L_gjj, rGjj + 0.01, termMonths, 1, repayType) + paymentAtMonthWan(L_com, lpr + 0.01, termMonths, 1, repayType);
 
   const cover20 = (incomeEstimateYuan * 0.8 - fixedExpenseYuan) / Math.max(1, monthlyCashOutYuan);
   const cover40 = (incomeEstimateYuan * 0.6 - fixedExpenseYuan) / Math.max(1, monthlyCashOutYuan);
@@ -718,8 +732,21 @@ export function calculateModel(input: ModelInput = {}): ModelOutput {
           cashLeftAfterPurchase: Math.round((cashWan * 10000) - (oneTimeCostWan * 10000)),
         },
         monthlyOutflow: Math.round(monthlyCashOutYuan),
-        first3YearsPressure: Math.round(monthlyCashOutYuan * 1.1),
-        stableAfter5Years: Math.round(monthlyCashOutYuan * 0.95),
+        // 等额本金月供逐月递减：第36期 < 第1期；等额本息两者相同
+        first3YearsPressure: Math.round(
+          Math.max(0,
+            (paymentAtMonthWan(L_gjj, rGjj, termMonths, Math.min(36, termMonths), repayType) +
+             paymentAtMonthWan(L_com, lpr, termMonths, Math.min(36, termMonths), repayType)) * 10000 +
+            monthlyHoldingYuan - gjjOffsetYuan - mortgageTaxSavingYuan
+          )
+        ),
+        stableAfter5Years: Math.round(
+          Math.max(0,
+            (paymentAtMonthWan(L_gjj, rGjj, termMonths, Math.min(60, termMonths), repayType) +
+             paymentAtMonthWan(L_com, lpr, termMonths, Math.min(60, termMonths), repayType)) * 10000 +
+            monthlyHoldingYuan - gjjOffsetYuan - mortgageTaxSavingYuan
+          )
+        ),
         principalPaid10Years: Math.round(principalPaid10y),
         interestPaid10Years: Math.round(interestPaid10y),
       },

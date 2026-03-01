@@ -1,0 +1,1031 @@
+"use client";
+
+import React, { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { calculateModel, type ModelOutput, type ScenarioComparison } from "../lib/calc";
+import { deriveEffectivePolicy } from "../lib/policyProfiles";
+
+/* ─────────────────────────── Types ─────────────────────────── */
+interface Inputs {
+  // Step 1 – Property
+  target_city: "上海" | "北京";
+  is_second_home: boolean;
+  P: number;
+  area: number;
+  holding_years: number;
+  multi_child_bonus: boolean;
+  // Step 2 – Financing
+  dp_min: number;
+  monthly_income: number;
+  Emergency: number;
+  n_years: number;
+  Repay_type: "等额本息" | "等额本金";
+  GJJ_extra: number;
+  GJJ_merge: boolean;
+  // Step 3 – Rent benchmark
+  rent_0: number;
+  years: number;
+  R_inv: number;
+  g_r: number;
+  // Step 4 – Fine-tune (optional)
+  Mix_ratio: number;
+  g_p: number;
+  Reno_hard: number;
+  Reno_soft: number;
+  PM_unit: number;
+  M5U: boolean;
+  Invest_consistency: number;
+  Move_freq_years: number;
+  Cash_runway_months: number;
+}
+
+const DEFAULT: Inputs = {
+  target_city: "上海",
+  is_second_home: false,
+  P: 600,
+  area: 90,
+  holding_years: 2,
+  multi_child_bonus: false,
+  dp_min: 20,
+  monthly_income: 25000,
+  Emergency: 20,
+  n_years: 30,
+  Repay_type: "等额本息",
+  GJJ_extra: 2000,
+  GJJ_merge: true,
+  rent_0: 8000,
+  years: 10,
+  R_inv: 5,
+  g_r: 3,
+  Mix_ratio: 50,
+  g_p: 3,
+  Reno_hard: 30,
+  Reno_soft: 12,
+  PM_unit: 5,
+  M5U: true,
+  Invest_consistency: 70,
+  Move_freq_years: 2,
+  Cash_runway_months: 6,
+};
+
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
+
+/* ─────────────────────────── Helpers ─────────────────────────── */
+const fmtWan = (yuan: number) => `${(yuan / 10000).toFixed(1)} 万元`;
+const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
+const fmtMon = (yuan: number) => `${Math.round(yuan).toLocaleString()} 元/月`;
+const sign = (n: number) => (n >= 0 ? "+" : "");
+
+/* ─────────────────────────── Field ─────────────────────────── */
+function Field({
+  label,
+  hint,
+  children,
+  required,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <div className="field-wrap" style={{ marginBottom: 22 }}>
+      <div className="field-label">
+        {required && (
+          <span style={{ color: "#f87171", marginRight: 3 }}>*</span>
+        )}
+        {label}
+        {hint && (
+          <span style={{ color: "rgba(255,255,255,0.30)", fontWeight: 400 }}>
+            {" · "}{hint}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ─────────────────────────── NumInput ─────────────────────────── */
+function NumInput({
+  value,
+  onChange,
+  placeholder,
+  min,
+  max,
+  step = 1,
+  suffix,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  suffix?: string;
+}) {
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        type="number"
+        className="gl-input"
+        value={value === 0 ? "" : value}
+        placeholder={placeholder}
+        min={min}
+        max={max}
+        step={step}
+        style={suffix ? { paddingRight: 60 } : {}}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (!Number.isNaN(v)) onChange(v);
+        }}
+      />
+      {suffix && (
+        <span
+          style={{
+            position: "absolute",
+            right: 14,
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.35)",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── Chips ─────────────────────────── */
+function Chips<T extends string | boolean | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: Array<{ label: string; value: T }>;
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="chip-group">
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          className={`chip ${o.value === value ? "active" : ""}`}
+          onClick={() => onChange(o.value)}
+          type="button"
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────── RangeRow ─────────────────────────── */
+function RangeRow({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  suffix,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <input
+        type="range"
+        className="gl-range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        style={{ flex: 1 }}
+      />
+      <span style={{ minWidth: 52, textAlign: "right", fontSize: 15, fontWeight: 600, color: "#93c5fd" }}>
+        {value}{suffix}
+      </span>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Accuracy ─────────────────────────── */
+function accuracyColor(pct: number) {
+  if (pct >= 85) return "#34d399";
+  if (pct >= 65) return "#60a5fa";
+  return "#fbbf24";
+}
+
+function calcAccuracy(inp: Inputs, step: Step): number {
+  const s1 = inp.P > 0 && inp.area > 0 ? 20 : 0;
+  const s2 = inp.dp_min > 0 && inp.monthly_income > 0 && inp.n_years > 0 ? 25 : 0;
+  const s3 = inp.rent_0 > 0 && inp.years > 0 ? 25 : 0;
+  const s4 = step >= 4 ? 14 : 0;
+  return Math.min(99, 16 + s1 + s2 + s3 + s4);
+}
+
+/* ─────────────────────────── StepHeader ─────────────────────────── */
+function StepHeader({ step, total, accuracy }: { step: number; total: number; accuracy: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
+      <div className="step-dots">
+        {Array.from({ length: total }, (_, i) => (
+          <div
+            key={i}
+            className={
+              i + 1 < step ? "step-dot done" : i + 1 === step ? "step-dot active" : "step-dot"
+            }
+          />
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span className="t-label">精度</span>
+        <div style={{ width: 72 }}>
+          <div className="accuracy-bar">
+            <div
+              className="accuracy-fill"
+              style={{ width: `${accuracy}%`, background: `linear-gradient(90deg,${accuracyColor(accuracy)},#818cf8)` }}
+            />
+          </div>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: accuracyColor(accuracy) }}>
+          {accuracy}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── NavRow ─────────────────────────── */
+function NavRow({
+  onBack,
+  onNext,
+  nextLabel = "下一步",
+  nextDisabled = false,
+  skipLabel,
+  onSkip,
+}: {
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  nextDisabled?: boolean;
+  skipLabel?: string;
+  onSkip?: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 36, gap: 12 }}>
+      <div>
+        {onBack && (
+          <button className="gl-btn" onClick={onBack} type="button">
+            ← 返回
+          </button>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        {skipLabel && onSkip && (
+          <button className="gl-btn" onClick={onSkip} type="button">
+            {skipLabel}
+          </button>
+        )}
+        <button className="gl-btn gl-btn-primary" onClick={onNext} disabled={nextDisabled} type="button">
+          {nextLabel} →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────── PolicyBadges ─────────────────────────── */
+function PolicyBadges({ inp }: { inp: Inputs }) {
+  const policy = useMemo(
+    () => deriveEffectivePolicy({ ...inp, M5U: inp.M5U ? "yes" : "no" }),
+    [inp]
+  );
+  const effectiveLpr = policy.lprPct + policy.bpBps / 100;
+  const deedRate =
+    inp.area <= 140
+      ? inp.is_second_home
+        ? policy.deedRateSmallSecondPct
+        : policy.deedRateSmallFirstPct
+      : inp.is_second_home
+      ? policy.deedRateLargeSecondPct
+      : policy.deedRateLargeFirstPct;
+
+  return (
+    <div className="glass-inset" style={{ padding: "14px 18px", marginBottom: 4 }}>
+      <div className="t-label" style={{ marginBottom: 10 }}>政策自动应用</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+        {[
+          `首付下限 ${policy.dpMinPct}%`,
+          `商贷 ${effectiveLpr.toFixed(2)}%`,
+          `公积金 ${inp.is_second_home ? policy.gjjRateSecondPct : policy.gjjRateFirstPct}%`,
+          `契税 ${deedRate}%`,
+          `增值税 ${inp.holding_years >= policy.vatExemptHoldingYears ? "免征✓" : `${policy.vatNonExemptPct}%`}`,
+        ].map((t) => (
+          <span key={t} className="badge badge-blue">{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   REPORT
+──────────────────────────────────────────────────────────────────────*/
+function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inputs; onReset: () => void }) {
+  const r = result.report;
+  const wv = result.wealthView;
+  const navDiff = wv?.navDiff ?? (result.buyTotal - result.rentTotal);
+  const buyNAV = wv?.buyNAV ?? result.buyTotal;
+  const rentNAV = wv?.rentNAV ?? result.rentTotal;
+
+  const zoneClass =
+    r.executiveSummary.zone === "建议购买区" ? "zone-buy"
+    : r.executiveSummary.zone === "继续租房区" ? "zone-rent"
+    : "zone-watch";
+  const zoneEmoji =
+    r.executiveSummary.zone === "建议购买区" ? "🏡"
+    : r.executiveSummary.zone === "继续租房区" ? "🏠"
+    : "🔭";
+
+  const scenarioColor = (s: ScenarioComparison) =>
+    s.gap > 0 ? "#34d399" : s.gap < 0 ? "#f87171" : "#94a3b8";
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 760, margin: "0 auto" }}>
+
+      {/* Zone banner */}
+      <div className={`glass ${zoneClass}`} style={{ padding: "28px 32px", marginBottom: 22, borderRadius: 24 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+          <span style={{ fontSize: 44 }}>{zoneEmoji}</span>
+          <div style={{ flex: 1 }}>
+            <div className="t-label" style={{ marginBottom: 6, color: "rgba(255,255,255,0.45)" }}>决策分区</div>
+            <div className="t-title" style={{ marginBottom: 8 }}>{r.executiveSummary.zone}</div>
+            <div className="t-body" style={{ marginBottom: 10 }}>{r.decisionMap.reason}</div>
+            <div className="t-label" style={{ color: "rgba(255,255,255,0.4)" }}>
+              {r.executiveSummary.decisionWindow}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Core NAV */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "买房净资产", value: fmtWan(buyNAV), cls: "grad-buy" },
+          { label: "租房净资产", value: fmtWan(rentNAV), cls: "grad-rent" },
+          { label: `差额（买−租）`, value: `${sign(navDiff)}${fmtWan(navDiff)}`, color: navDiff >= 0 ? "#34d399" : "#f87171" },
+        ].map((item) => (
+          <div key={item.label} className="stat-box">
+            <div className="t-label" style={{ marginBottom: 7 }}>{item.label}</div>
+            <div className={`t-value ${item.cls ?? ""}`} style={item.color ? { color: item.color } : {}}>
+              {item.value}
+            </div>
+            <div className="t-label" style={{ marginTop: 4 }}>{inp.years} 年后</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Scenarios */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>📊 三情景净资产</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {(r.netWorthComparison.scenarios ?? []).map((s) => {
+            const pct = Math.min(96, Math.max(6, Math.abs(s.gap) / Math.max(1, Math.abs(navDiff) * 1.8) * 80 + 8));
+            return (
+              <div key={s.name} className="glass-inset" style={{ padding: "13px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+                  <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
+                    <span className="badge badge-blue" style={{ fontSize: 11 }}>
+                      {s.name === "Bear" ? "偏弱" : s.name === "Base" ? "基准" : "偏强"}
+                    </span>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+                      房价 {fmtPct(s.houseGrowth)}/年
+                    </span>
+                  </div>
+                  <span style={{ fontWeight: 700, color: scenarioColor(s), fontSize: 15 }}>
+                    {sign(s.gap)}{fmtWan(s.gap)}
+                  </span>
+                </div>
+                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                  <div style={{
+                    width: `${pct}%`, height: "100%", borderRadius: 2,
+                    background: s.gap >= 0 ? "linear-gradient(90deg,#34d399,#60a5fa)" : "linear-gradient(90deg,#f87171,#c084fc)",
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {r.netWorthComparison.crossoverYear !== null && (
+          <div style={{ marginTop: 12 }}>
+            <span className="badge badge-green">净资产超越点：第 {r.netWorthComparison.crossoverYear} 年</span>
+          </div>
+        )}
+        <div style={{ marginTop: 10 }}>
+          <span className="badge badge-amber">房价平衡增速：{fmtPct(r.netWorthComparison.breakEvenGrowth)}</span>
+        </div>
+      </div>
+
+      {/* Financial baseline */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>💼 财务基线</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            { label: "月收入估算", value: fmtMon(r.financialBaseline.monthlyIncomeEstimate) },
+            { label: "月固定支出", value: fmtMon(r.financialBaseline.fixedExpense) },
+            {
+              label: "购房后自由现金",
+              value: fmtMon(r.financialBaseline.freeCashAfterMortgage),
+              warn: r.financialBaseline.freeCashAfterMortgage < 0,
+            },
+            { label: "紧急备用月数", value: `${r.financialBaseline.emergencyRunwayMonths.toFixed(1)} 个月` },
+            { label: "收入稳定性", value: r.financialBaseline.incomeStabilityLevel },
+            { label: "液动资产比率", value: fmtPct(r.financialBaseline.liquidAssetsRatio) },
+          ].map((item) => (
+            <div key={item.label} className="stat-box" style={{ padding: "11px 15px" }}>
+              <div className="t-label" style={{ marginBottom: 5 }}>{item.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "warn" in item && item.warn ? "#f87171" : "#e8eaf0" }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Buy simulation */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🏡 购房模拟</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          {[
+            { label: "首付", value: fmtWan(r.buySimulation.initialCosts.downPayment) },
+            { label: "税费", value: fmtWan(r.buySimulation.initialCosts.taxesAndFees) },
+            { label: "装修", value: fmtWan(r.buySimulation.initialCosts.renovation) },
+            { label: "一次性合计", value: fmtWan(r.buySimulation.initialCosts.total) },
+          ].map((item) => (
+            <div key={item.label} className="stat-box" style={{ padding: "11px 15px" }}>
+              <div className="t-label" style={{ marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="gl-divider" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          {[
+            { label: "当前月供", value: fmtMon(r.buySimulation.monthlyOutflow) },
+            { label: "前 3 年月均", value: fmtMon(r.buySimulation.first3YearsPressure) },
+            { label: "第 5 年月供", value: fmtMon(r.buySimulation.stableAfter5Years) },
+          ].map((item) => (
+            <div key={item.label} className="stat-box" style={{ padding: "11px 15px" }}>
+              <div className="t-label" style={{ marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className="badge badge-amber">10年利息 {fmtWan(r.buySimulation.interestPaid10Years)}</span>
+          <span className="badge badge-blue">10年还本 {fmtWan(r.buySimulation.principalPaid10Years)}</span>
+        </div>
+      </div>
+
+      {/* Rent simulation */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🏠 租房模拟</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          {(r.rentSimulation.scenarios ?? []).map((s) => (
+            <div key={s.label} className="stat-box" style={{ padding: "11px 15px", flex: 1, minWidth: 100 }}>
+              <div className="t-label" style={{ marginBottom: 4 }}>{s.label} ({fmtPct(s.growthRate)}/年)</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtWan(s.totalCost)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span className="badge badge-purple">搬迁摩擦 {Math.round(r.rentSimulation.relocationCost).toLocaleString()} 元</span>
+          <span className="badge badge-green">首付再投资 {fmtWan(r.rentSimulation.investmentContribution)}</span>
+        </div>
+      </div>
+
+      {/* Stress test */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>⚡ 压力测试</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            {
+              label: "收入下降 20%",
+              value: `覆盖率 ${(r.stressTest.incomeDrop20.monthlyCoverageRatio * 100).toFixed(0)}%`,
+              ok: r.stressTest.incomeDrop20.safe,
+            },
+            {
+              label: "收入下降 40%",
+              value: `覆盖率 ${(r.stressTest.incomeDrop40.monthlyCoverageRatio * 100).toFixed(0)}%`,
+              ok: r.stressTest.incomeDrop40.safe,
+            },
+            {
+              label: "利率上行 +50BP",
+              value: `月供 +${r.stressTest.rateUp50bpMonthlyChange.toLocaleString()} 元`,
+              ok: r.stressTest.rateUp50bpMonthlyChange < 2000,
+            },
+            {
+              label: "失业 6 个月",
+              value: r.stressTest.unemployment6MonthsSafe ? "✓ 备用金充足" : "⚠ 备用金告急",
+              ok: r.stressTest.unemployment6MonthsSafe,
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="stat-box"
+              style={{
+                padding: "11px 15px",
+                borderColor: item.ok ? "rgba(52,211,153,0.22)" : "rgba(248,113,113,0.22)",
+              }}
+            >
+              <div className="t-label" style={{ marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: item.ok ? "#6ee7b7" : "#fca5a5" }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Triggers */}
+      <div className="glass" style={{ padding: "22px 26px", marginBottom: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🔔 触发条件</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {(r.triggerConditions ?? []).map((c, i) => (
+            <div key={i} className="glass-inset" style={{ padding: "11px 15px", fontSize: 13, color: "rgba(255,255,255,0.72)" }}>
+              {c}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Policy tag + reset */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
+        <span className="badge badge-blue">{r.policy.policyName}</span>
+        <span className="t-label">{r.policy.policyVersion}</span>
+      </div>
+
+      <div style={{ textAlign: "center", paddingBottom: 56 }}>
+        <button className="gl-btn" onClick={onReset} type="button">
+          ↩ 重新测算
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   PAGE
+──────────────────────────────────────────────────────────────────────*/
+export default function WizardPage() {
+  const [step, setStep] = useState<Step>(0);
+  const [dir, setDir] = useState<"fwd" | "back">("fwd");
+  const [inputs, dispatch] = useReducer(
+    (state: Inputs, patch: Partial<Inputs>) => ({ ...state, ...patch }),
+    DEFAULT
+  );
+  const [result, setResult] = useState<ModelOutput | null>(null);
+  const [calculating, setCalculating] = useState(false);
+  const topRef = useRef<HTMLDivElement>(null);
+
+  const accuracy = calcAccuracy(inputs, step);
+
+  const go = useCallback((next: Step, isBack = false) => {
+    setDir(isBack ? "back" : "fwd");
+    setStep(next);
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
+  }, []);
+
+  /* Required-field guards */
+  const canStep1 = inputs.P > 0 && inputs.area > 0;
+  const canStep2 = inputs.dp_min > 0 && inputs.monthly_income > 0 && inputs.n_years > 0;
+  const canStep3 = inputs.rent_0 > 0 && inputs.years > 0;
+
+  const runCalculation = useCallback(() => {
+    setCalculating(true);
+    const policy = deriveEffectivePolicy({ ...inputs, M5U: inputs.M5U ? "yes" : "no" });
+    const merged = {
+      ...inputs,
+      M5U: inputs.M5U ? "yes" : "no",
+      is_second_home: inputs.is_second_home ? 1 : 0,
+      multi_child_bonus: inputs.multi_child_bonus ? 1 : 0,
+      GJJ_merge: inputs.GJJ_merge ? 1 : 0,
+      LPR: policy.lprPct,
+      BP: policy.bpBps,
+      r_gjj: inputs.is_second_home ? policy.gjjRateSecondPct : policy.gjjRateFirstPct,
+      Deed1_rate:
+        inputs.area <= 140
+          ? policy.deedRateSmallFirstPct
+          : policy.deedRateLargeFirstPct,
+      Deed2_rate:
+        inputs.area <= 140
+          ? policy.deedRateSmallSecondPct
+          : policy.deedRateLargeSecondPct,
+      VAT_rate:
+        inputs.holding_years >= policy.vatExemptHoldingYears ? 0 : policy.vatNonExemptPct,
+      GJJ_max_single: policy.gjjMaxSingleWan,
+      GJJ_max_family: policy.gjjMaxFamilyWan,
+      GJJ_max_multichild: policy.gjjMaxMultiChildWan,
+    };
+    /* Yield to browser so loading state renders */
+    setTimeout(() => {
+      try {
+        const out = calculateModel(merged);
+        setResult(out);
+      } catch (e) {
+        console.error(e);
+      }
+      setCalculating(false);
+      go(5);
+    }, 350);
+  }, [inputs, go]);
+
+  const reset = useCallback(() => {
+    setResult(null);
+    go(0);
+  }, [go]);
+
+  const animClass = dir === "fwd" ? "step-enter" : "step-back";
+
+  return (
+    <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", paddingBottom: 60 }}>
+      {/* Ambient orbs */}
+      <div className="orb" style={{ width: 620, height: 620, top: -220, left: -170,
+        background: "radial-gradient(circle,rgba(99,102,241,0.32) 0%,transparent 70%)" }} />
+      <div className="orb" style={{ width: 480, height: 480, bottom: -120, right: -90,
+        background: "radial-gradient(circle,rgba(52,211,153,0.18) 0%,transparent 70%)", animationDelay: "3s" }} />
+      <div className="orb" style={{ width: 340, height: 340, top: "42%", right: "18%",
+        background: "radial-gradient(circle,rgba(244,114,182,0.12) 0%,transparent 70%)", animationDelay: "6s" }} />
+
+      <div ref={topRef} />
+
+      <div style={{ maxWidth: 580, margin: "0 auto", padding: "0 18px" }}>
+
+        {/* ══════════════ STEP 0 — INTRO ══════════════ */}
+        {step === 0 && (
+          <div key="s0" className={animClass} style={{ paddingTop: 80 }}>
+            <div style={{ textAlign: "center", marginBottom: 52 }}>
+              <div className="t-label" style={{ marginBottom: 14, color: "#60a5fa", letterSpacing: "0.12em" }}>
+                买 VS 租 · 专业决策系统
+              </div>
+              <h1 className="t-hero" style={{ marginBottom: 18 }}>
+                <span className="grad-text">你现在买房</span>
+                <br />
+                真的划算吗？
+              </h1>
+              <p className="t-subtitle" style={{ maxWidth: 400, margin: "0 auto 0", lineHeight: 1.85 }}>
+                4 步引导，基于真实净资产模型对比买房与租房。
+                <br />
+                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+                  填得越多，模型误差越低 · 数据本地计算不上传
+                </span>
+              </p>
+            </div>
+
+            <div className="glass" style={{ padding: "26px 28px", marginBottom: 24 }}>
+              <Field label="目标城市">
+                <Chips
+                  options={[
+                    { label: "🌆 上海", value: "上海" as const },
+                    { label: "🏛 北京", value: "北京" as const },
+                  ]}
+                  value={inputs.target_city}
+                  onChange={(v) => dispatch({ target_city: v })}
+                />
+              </Field>
+              <Field label="购房套数">
+                <Chips
+                  options={[
+                    { label: "首套", value: false },
+                    { label: "二套", value: true },
+                  ]}
+                  value={inputs.is_second_home}
+                  onChange={(v) => dispatch({ is_second_home: v })}
+                />
+              </Field>
+            </div>
+
+            <div style={{ textAlign: "center" }}>
+              <button
+                className="gl-btn gl-btn-primary"
+                onClick={() => go(1)}
+                type="button"
+                style={{ fontSize: 16, padding: "15px 52px" }}
+              >
+                开始测算 →
+              </button>
+              <div style={{ marginTop: 12, fontSize: 12, color: "rgba(255,255,255,0.25)" }}>
+                约 3 分钟完成全部 4 步
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ STEP 1 — PROPERTY ══════════════ */}
+        {step === 1 && (
+          <div key="s1" className={animClass} style={{ paddingTop: 52 }}>
+            <StepHeader step={1} total={4} accuracy={accuracy} />
+            <div className="glass" style={{ padding: "26px 28px", marginBottom: 18 }}>
+              <div className="t-title" style={{ fontSize: 18, marginBottom: 4 }}>第一步：房产信息</div>
+              <p className="t-subtitle" style={{ marginBottom: 24, fontSize: 13 }}>
+                必填项将决定首付金额、贷款规模与税费结构。
+              </p>
+
+              <Field label="房屋总价" hint="万元" required>
+                <NumInput value={inputs.P} onChange={(v) => dispatch({ P: v })}
+                  placeholder="600" min={50} max={5000} step={10} suffix="万元" />
+              </Field>
+              <Field label="建筑面积" hint="平方米" required>
+                <NumInput value={inputs.area} onChange={(v) => dispatch({ area: v })}
+                  placeholder="90" min={20} max={500} suffix="㎡" />
+              </Field>
+              <Field label="持有年限（用于增值税）">
+                <RangeRow value={inputs.holding_years} onChange={(v) => dispatch({ holding_years: v })}
+                  min={1} max={10} suffix=" 年" />
+              </Field>
+              <Field label="是否多孩家庭">
+                <Chips
+                  options={[{ label: "否", value: false }, { label: "是（公积金上浮）", value: true }]}
+                  value={inputs.multi_child_bonus}
+                  onChange={(v) => dispatch({ multi_child_bonus: v })}
+                />
+              </Field>
+
+              <div style={{ marginTop: 6 }}>
+                <PolicyBadges inp={inputs} />
+              </div>
+            </div>
+
+            {!canStep1 && (
+              <div className="glass-inset" style={{ padding: "10px 16px", marginBottom: 14, color: "#fca5a5", fontSize: 13 }}>
+                ⚠ 请填写房屋总价和建筑面积才能继续
+              </div>
+            )}
+            <NavRow
+              onBack={() => go(0, true)}
+              onNext={() => go(2)}
+              nextDisabled={!canStep1}
+            />
+          </div>
+        )}
+
+        {/* ══════════════ STEP 2 — FINANCING ══════════════ */}
+        {step === 2 && (
+          <div key="s2" className={animClass} style={{ paddingTop: 52 }}>
+            <StepHeader step={2} total={4} accuracy={accuracy} />
+            <div className="glass" style={{ padding: "26px 28px", marginBottom: 18 }}>
+              <div className="t-title" style={{ fontSize: 18, marginBottom: 4 }}>第二步：资金与还款</div>
+              <p className="t-subtitle" style={{ marginBottom: 24, fontSize: 13 }}>
+                月收入与备用金将用于压力测试；贷款期限影响月供计算。
+              </p>
+
+              <Field label="首付比例" hint="不低于政策下限">
+                <RangeRow
+                  value={inputs.dp_min}
+                  onChange={(v) => dispatch({ dp_min: v })}
+                  min={(() => {
+                    const pol = deriveEffectivePolicy({ ...inputs, M5U: inputs.M5U ? "yes" : "no" });
+                    return pol.dpMinPct;
+                  })()}
+                  max={80}
+                  suffix="%"
+                />
+              </Field>
+              <Field label="月收入（税后）" required>
+                <NumInput value={inputs.monthly_income} onChange={(v) => dispatch({ monthly_income: v })}
+                  placeholder="25000" min={1000} suffix="元" />
+              </Field>
+              <Field label="现有可流动资产" hint="不含购房资金" required>
+                <NumInput value={inputs.Emergency} onChange={(v) => dispatch({ Emergency: v })}
+                  placeholder="20" min={0} suffix="万元" />
+              </Field>
+              <Field label="贷款期限" required>
+                <Chips
+                  options={[
+                    { label: "20 年", value: 20 as number },
+                    { label: "25 年", value: 25 as number },
+                    { label: "30 年", value: 30 as number },
+                  ]}
+                  value={inputs.n_years}
+                  onChange={(v) => dispatch({ n_years: v })}
+                />
+              </Field>
+              <Field label="还款方式">
+                <Chips
+                  options={[
+                    { label: "等额本息", value: "等额本息" as const },
+                    { label: "等额本金", value: "等额本金" as const },
+                  ]}
+                  value={inputs.Repay_type}
+                  onChange={(v) => dispatch({ Repay_type: v })}
+                />
+              </Field>
+              <Field label="公积金月缴（双方合计）" hint="0 = 不使用公积金贷款">
+                <NumInput value={inputs.GJJ_extra} onChange={(v) => dispatch({ GJJ_extra: v })}
+                  placeholder="2000" min={0} suffix="元/月" />
+              </Field>
+              <Field label="公积金额度口径">
+                <Chips
+                  options={[
+                    { label: "家庭合并", value: true },
+                    { label: "单人", value: false },
+                  ]}
+                  value={inputs.GJJ_merge}
+                  onChange={(v) => dispatch({ GJJ_merge: v })}
+                />
+              </Field>
+            </div>
+
+            {!canStep2 && (
+              <div className="glass-inset" style={{ padding: "10px 16px", marginBottom: 14, color: "#fca5a5", fontSize: 13 }}>
+                ⚠ 请填写月收入、可流动资产并确认贷款期限
+              </div>
+            )}
+            <NavRow
+              onBack={() => go(1, true)}
+              onNext={() => go(3)}
+              nextDisabled={!canStep2}
+            />
+          </div>
+        )}
+
+        {/* ══════════════ STEP 3 — RENT BENCHMARK ══════════════ */}
+        {step === 3 && (
+          <div key="s3" className={animClass} style={{ paddingTop: 52 }}>
+            <StepHeader step={3} total={4} accuracy={accuracy} />
+            <div className="glass" style={{ padding: "26px 28px", marginBottom: 18 }}>
+              <div className="t-title" style={{ fontSize: 18, marginBottom: 4 }}>第三步：租房对照</div>
+              <p className="t-subtitle" style={{ marginBottom: 24, fontSize: 13 }}>
+                这三项决定买与租两条路径的净资产比较基准。
+              </p>
+
+              <Field label="等效月租金" hint="若租同类房的月租" required>
+                <NumInput value={inputs.rent_0} onChange={(v) => dispatch({ rent_0: v })}
+                  placeholder="8000" min={500} suffix="元/月" />
+              </Field>
+              <Field label="分析年限" hint="净资产比较的时间窗口" required>
+                <RangeRow value={inputs.years} onChange={(v) => dispatch({ years: v })}
+                  min={3} max={30} suffix=" 年" />
+              </Field>
+              <Field label="预期年化投资回报" hint="租房资金的再投资收益率">
+                <RangeRow value={inputs.R_inv} onChange={(v) => dispatch({ R_inv: v })}
+                  min={1} max={15} step={0.5} suffix="%" />
+              </Field>
+              <Field label="预期租金年涨幅">
+                <RangeRow value={inputs.g_r} onChange={(v) => dispatch({ g_r: v })}
+                  min={0} max={10} step={0.5} suffix="%" />
+              </Field>
+            </div>
+
+            {!canStep3 && (
+              <div className="glass-inset" style={{ padding: "10px 16px", marginBottom: 14, color: "#fca5a5", fontSize: 13 }}>
+                ⚠ 请填写当前月租金并选择分析年限
+              </div>
+            )}
+            <NavRow
+              onBack={() => go(2, true)}
+              onNext={() => go(4)}
+              nextDisabled={!canStep3}
+              nextLabel="进入精算优化"
+            />
+          </div>
+        )}
+
+        {/* ══════════════ STEP 4 — FINE TUNE ══════════════ */}
+        {step === 4 && (
+          <div key="s4" className={animClass} style={{ paddingTop: 52 }}>
+            <StepHeader step={4} total={4} accuracy={accuracy} />
+            <div className="glass" style={{ padding: "26px 28px", marginBottom: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div className="t-title" style={{ fontSize: 18 }}>第四步：精算优化</div>
+                <span className="badge badge-amber">可跳过</span>
+              </div>
+              <p className="t-subtitle" style={{ marginBottom: 24, fontSize: 13 }}>
+                填写越多，模型误差越低。也可直接跳过生成报告。
+              </p>
+
+              <Field label="公积金混合比例" hint="占贷款总额">
+                <RangeRow value={inputs.Mix_ratio} onChange={(v) => dispatch({ Mix_ratio: v })}
+                  min={0} max={100} suffix="%" />
+              </Field>
+              <Field label="预期房价年涨幅">
+                <RangeRow value={inputs.g_p} onChange={(v) => dispatch({ g_p: v })}
+                  min={-5} max={12} step={0.5} suffix="%" />
+              </Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field label="装修硬装" hint="万元">
+                  <NumInput value={inputs.Reno_hard} onChange={(v) => dispatch({ Reno_hard: v })}
+                    placeholder="30" min={0} suffix="万" />
+                </Field>
+                <Field label="装修软装" hint="万元">
+                  <NumInput value={inputs.Reno_soft} onChange={(v) => dispatch({ Reno_soft: v })}
+                    placeholder="12" min={0} suffix="万" />
+                </Field>
+              </div>
+              <Field label="物业费" hint="元/㎡/月">
+                <NumInput value={inputs.PM_unit} onChange={(v) => dispatch({ PM_unit: v })}
+                  placeholder="5" min={0} step={0.5} suffix="元/㎡" />
+              </Field>
+              <Field label="是否满五唯一">
+                <Chips
+                  options={[
+                    { label: "是（免个税）", value: true },
+                    { label: "否", value: false },
+                  ]}
+                  value={inputs.M5U}
+                  onChange={(v) => dispatch({ M5U: v })}
+                />
+              </Field>
+              <Field label="投资执行纪律" hint="月差额实际再投入比例">
+                <RangeRow value={inputs.Invest_consistency} onChange={(v) => dispatch({ Invest_consistency: v })}
+                  min={0} max={100} suffix="%" />
+              </Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field label="平均搬家间隔">
+                  <RangeRow value={inputs.Move_freq_years} onChange={(v) => dispatch({ Move_freq_years: v })}
+                    min={1} max={10} suffix=" 年" />
+                </Field>
+                <Field label="现金安全缓冲">
+                  <RangeRow value={inputs.Cash_runway_months} onChange={(v) => dispatch({ Cash_runway_months: v })}
+                    min={1} max={24} suffix=" 月" />
+                </Field>
+              </div>
+            </div>
+
+            <NavRow
+              onBack={() => go(3, true)}
+              onNext={runCalculation}
+              nextLabel={calculating ? "计算中…" : "生成报告"}
+              nextDisabled={calculating}
+              skipLabel="跳过并生成报告"
+              onSkip={() => { if (!calculating) runCalculation(); }}
+            />
+
+            {calculating && (
+              <div style={{ textAlign: "center", marginTop: 28 }}>
+                <div style={{ width: 220, margin: "0 auto 12px" }}>
+                  <div className="accuracy-bar" style={{ height: 6 }}>
+                    <div className="accuracy-fill" style={{ width: "100%", animationDuration: "1.2s" }} />
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+                  正在运行净资产模型…
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════ STEP 5 — REPORT ══════════════ */}
+        {step === 5 && result && (
+          <div key="s5" className={animClass} style={{ paddingTop: 44 }}>
+            <div style={{ textAlign: "center", marginBottom: 34 }}>
+              <div className="t-label" style={{ marginBottom: 10, color: "#60a5fa", letterSpacing: "0.1em" }}>
+                决策报告 · {inputs.target_city} · {inputs.years} 年窗口
+              </div>
+              <h2 style={{ fontSize: "clamp(24px,4vw,38px)", fontWeight: 700, marginBottom: 10,
+                background: "linear-gradient(135deg,#93c5fd,#c4b5fd,#86efac)",
+                WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                净资产分析完成
+              </h2>
+              <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+                <span className="badge badge-green">精度 {accuracy}%</span>
+                <span className="badge badge-blue">
+                  {inputs.target_city} · {inputs.is_second_home ? "二套" : "首套"}
+                </span>
+                <span className="badge badge-purple">
+                  {inputs.P} 万元 · {inputs.area} ㎡
+                </span>
+              </div>
+            </div>
+
+            <ReportScreen result={result} inp={inputs} onReset={reset} />
+          </div>
+        )}
+
+        {/* Fallback: result missing on step 5 */}
+        {step === 5 && !result && (
+          <div style={{ textAlign: "center", paddingTop: 80 }}>
+            <div style={{ color: "rgba(255,255,255,0.5)", marginBottom: 20 }}>计算出错，请重试</div>
+            <button className="gl-btn gl-btn-primary" onClick={() => go(0)} type="button">
+              返回首页
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
