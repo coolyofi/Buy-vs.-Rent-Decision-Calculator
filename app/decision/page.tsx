@@ -14,6 +14,13 @@ import {
   type RiskProfile,
 } from "../../lib/decisionCalc";
 import { deriveEffectivePolicy } from "../../lib/policyProfiles";
+import {
+  IconBuyHouse, IconRentHouse, IconWatch,
+  IconBarChart, IconTrendingUp, IconCoins, IconCalendar,
+  IconArrowUndo, IconCity, IconBuilding,
+  IconShield, IconScale, IconRocket,
+  IconBank, IconCalendar as IconDeposit, IconCN, IconHK, IconUS, IconBondFund, IconGJJ,
+} from "../../lib/icons";
 
 /* ──────────────── Helpers ──────────────── */
 const fmtW = (w: number) => `${w.toFixed(1)} 万`;
@@ -217,13 +224,13 @@ function StepDots({ step, total }: { step: number; total: number }) {
 
 /* ──────────────── Asset input row ──────────────── */
 function AssetRow({ icon, label, hint, value, onChange, defaultYield, color }: {
-  icon: string; label: string; hint: string; value: number; onChange: (v: number) => void;
+  icon: React.ReactNode; label: string; hint: string; value: number; onChange: (v: number) => void;
   defaultYield: string; color: string;
 }) {
   return (
     <div className="glass-inset" style={{ padding: "13px 15px", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.38)" }}>{hint}</div>
@@ -269,7 +276,7 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
   const isRent = r.recommendation === "建议继续租房";
 
   const zoneClass = isBuy ? "zone-buy" : isRent ? "zone-rent" : "zone-watch";
-  const zoneIcon = isBuy ? "🏡" : isRent ? "🏠" : "🔭";
+  const zoneIcon = isBuy ? <IconBuyHouse size={44} /> : isRent ? <IconRentHouse size={44} /> : <IconWatch size={44} />;
 
   const scenarioColor = (g: number) => g > 0 ? "#34d399" : g < 0 ? "#f87171" : "#94a3b8";
 
@@ -279,7 +286,7 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
       {/* Zone banner */}
       <div className={`glass ${zoneClass}`} style={{ padding: "26px 28px", marginBottom: 20, borderRadius: 22 }}>
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 44 }}>{zoneIcon}</span>
+          <span style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.85 }}>{zoneIcon}</span>
           <div>
             <div className="t-label" style={{ marginBottom: 4, color: "rgba(255,255,255,0.42)" }}>资产决策结论</div>
             <div className="t-title" style={{ marginBottom: 8 }}>{r.recommendation}</div>
@@ -307,10 +314,10 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
 
       {/* Feasibility + liquidity */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>💰 首付可行性与资产结构</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconCoins size={15} /> 首付可行性与资产结构</div>
         {!r.feasible && (
           <InfoBox color="red">
-            ⚠ 当前资产合计 <strong>{fmtW(r.total_assets_wan)}</strong>，首付 + 税费 + 装修需要{" "}
+            当前资产合计 <strong>{fmtW(r.total_assets_wan)}</strong>，首付 + 税费 + 装修需要{" "}
             <strong>{fmtW(r.liquidation.total_needed_wan)}</strong>，资金缺口约{" "}
             <strong>{fmtW(r.shortfall_wan)}</strong>，需额外筹款或降低首付目标价。
           </InfoBox>
@@ -358,7 +365,7 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
 
       {/* Monthly pressure */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>📆 现金流对比（各时间节点）</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconCalendar size={15} /> 现金流对比（各时间节点）</div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -396,7 +403,7 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
 
       {/* Scenarios */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>📊 三情景净资产（{w.horizon_years} 年后）</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconBarChart size={15} /> 三情景净资产（{w.horizon_years} 年后）</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {r.scenarios.map((s) => (
             <div key={s.label} className="glass-inset" style={{ padding: "14px 16px" }}>
@@ -429,7 +436,7 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
       {/* Yearly table toggle */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showTable ? 16 : 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>📈 每年净资产明细</div>
+          <div style={{ fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}><IconTrendingUp size={15} /> 每年净资产明细</div>
           <button className="gl-btn" type="button" onClick={() => setShowTable(!showTable)}
             style={{ fontSize: 12, padding: "6px 14px" }}>
             {showTable ? "收起" : "展开"}
@@ -466,8 +473,8 @@ function ReportView({ result, w, onReset }: { result: DecisionOutput; w: Wizard;
       </div>
 
       <div style={{ textAlign: "center", paddingBottom: 60, paddingTop: 10 }}>
-        <button className="gl-btn" onClick={onReset} type="button" style={{ marginRight: 12 }}>
-          ↩ 重新测算
+        <button className="gl-btn" onClick={onReset} type="button" style={{ marginRight: 12, display: "inline-flex", alignItems: "center", gap: 7 }}>
+          <IconArrowUndo size={15} /> 重新测算
         </button>
         <Link href="/" style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>
           切换到经典版本
@@ -637,7 +644,7 @@ export default function DecisionPage() {
             <div className="glass" style={{ padding: "24px 26px", marginBottom: 18 }}>
               <Field label="目标城市" desc="影响利率、公积金上限、契税政策。">
                 <Chips
-                  options={[{ label: "🌆 上海", value: "上海" as const }, { label: "🏛 北京", value: "北京" as const }]}
+                  options={[{ label: "上海", value: "上海" as const }, { label: "北京", value: "北京" as const }]}
                   value={w.target_city} onChange={(v) => dispatch({ target_city: v })} />
               </Field>
               <Field label="购房套数" desc="首套与二套的首付比例、利率均有差异。">
@@ -652,7 +659,9 @@ export default function DecisionPage() {
                       className={`chip ${w.risk_profile === p ? "active" : ""}`}
                       style={{ padding: "12px 8px", display: "flex", flexDirection: "column", gap: 5 }}
                       onClick={() => applyRiskPreset(p)}>
-                      <span style={{ fontSize: 18 }}>{p === "保守" ? "🛡" : p === "平衡" ? "⚖️" : "🚀"}</span>
+                      <span style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {p === "保守" ? <IconShield size={18} /> : p === "平衡" ? <IconScale size={18} /> : <IconRocket size={18} />}
+                      </span>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{p}</span>
                       <span style={{ fontSize: 11, opacity: 0.6 }}>
                         {p === "保守" ? "A股 5% / 美股 7%" : p === "平衡" ? "A股 7% / 美股 10%" : "A股 10% / 美股 12%"}
@@ -693,10 +702,10 @@ export default function DecisionPage() {
                 <div className="t-label">现金类</div>
                 <span className="badge badge-blue">低风险 · 随时可用</span>
               </div>
-              <AssetRow icon="🏦" label="银行活期 / 现金" hint="包括余额宝、活期存款"
+              <AssetRow icon={<IconBank size={20} />} label="銀行活期 / 现金" hint="包括余额宝、活期存款"
                 value={w.cash_wan} onChange={(v) => dispatch({ cash_wan: v })}
                 defaultYield="≈ 0.5%" color="#60a5fa" />
-              <AssetRow icon="📅" label="定期存款 / 大额存单" hint="到期会解冻，机会成本低"
+              <AssetRow icon={<IconDeposit size={20} />} label="定期存款 / 大额存单" hint="到期会解冻，机会成本低"
                 value={w.fixed_deposit_wan} onChange={(v) => dispatch({ fixed_deposit_wan: v })}
                 defaultYield="≈ 2.5%" color="#60a5fa" />
             </div>
@@ -706,13 +715,13 @@ export default function DecisionPage() {
                 <div className="t-label">权益类（机会成本最高）</div>
                 <span className="badge badge-purple">高收益 · 高波动</span>
               </div>
-              <AssetRow icon="🇨🇳" label="A 股（沪深市场）" hint="过去 10 年年化约 5–9%（大起伏）"
+              <AssetRow icon={<IconCN size={20} />} label="A 股（泪深市场）" hint="过去 10 年年化约 5–99%（大起伏）"
                 value={w.a_stock_wan} onChange={(v) => dispatch({ a_stock_wan: v })}
                 defaultYield={`${RISK_PRESETS[w.risk_profile].a_stock_rate}%`} color="#c084fc" />
-              <AssetRow icon="🇭🇰" label="港股（恒生市场）" hint="近十年表现偏弱，但红利稳定"
+              <AssetRow icon={<IconHK size={20} />} label="港股（恒生市场）" hint="近十年表现偏弱，但红利稳定"
                 value={w.hk_stock_wan} onChange={(v) => dispatch({ hk_stock_wan: v })}
                 defaultYield={`${RISK_PRESETS[w.risk_profile].hk_stock_rate}%`} color="#c084fc" />
-              <AssetRow icon="🇺🇸" label="美股（标普 / 纳斯达克）" hint="近十年标普 500 年化约 10–12%"
+              <AssetRow icon={<IconUS size={20} />} label="美股（标普 / 纳斯达克）" hint="近十年标普 500 年化约 10–12%"
                 value={w.us_stock_wan} onChange={(v) => dispatch({ us_stock_wan: v })}
                 defaultYield={`${RISK_PRESETS[w.risk_profile].us_stock_rate}%`} color="#f472b6" />
             </div>
@@ -722,10 +731,10 @@ export default function DecisionPage() {
                 <div className="t-label">理财 / 公积金</div>
                 <span className="badge badge-green">中低风险</span>
               </div>
-              <AssetRow icon="📊" label="固收理财 / 基金 / 保险年金" hint="银行理财、债基、年金险等"
+              <AssetRow icon={<IconBondFund size={20} />} label="固收理财 / 基金 / 保险年金" hint="銀行理财、喀基、年金险等"
                 value={w.bond_fund_wan} onChange={(v) => dispatch({ bond_fund_wan: v })}
                 defaultYield={`${RISK_PRESETS[w.risk_profile].bond_fund_rate}%`} color="#34d399" />
-              <AssetRow icon="🏠" label="公积金账户余额" hint="可直接提取用于首付，不计机会成本"
+              <AssetRow icon={<IconGJJ size={20} />} label="公积金账户余额" hint="可直接提取用于首付，不计机会成本"
                 value={w.gjj_balance_wan} onChange={(v) => dispatch({ gjj_balance_wan: v })}
                 defaultYield="≈ 1.5%" color="#fbbf24" />
             </div>
@@ -827,7 +836,7 @@ export default function DecisionPage() {
             </div>
             {totalNeededWan > totalAssetsWan && (
               <InfoBox color="red">
-                ⚠ 资产合计 {fmtW(totalAssetsWan)} 不足以覆盖购房所需 {fmtW(totalNeededWan)}，
+                资产合计 {fmtW(totalAssetsWan)} 不足以覆盖购房所需 {fmtW(totalNeededWan)}，
                 差额 {fmtW(totalNeededWan - totalAssetsWan)}。可调整首付比例或降低目标总价。
               </InfoBox>
             )}

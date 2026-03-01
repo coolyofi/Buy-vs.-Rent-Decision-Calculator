@@ -4,6 +4,12 @@ import React, { useCallback, useMemo, useReducer, useRef, useState } from "react
 import Link from "next/link";
 import { calculateModel, type ModelOutput, type ScenarioComparison } from "../lib/calc";
 import { deriveEffectivePolicy } from "../lib/policyProfiles";
+import {
+  IconBuyHouse, IconRentHouse, IconWatch,
+  IconBarChart, IconTrendingUp, IconBriefcase, IconHouse, IconApartment,
+  IconLightning, IconBell, IconArrowUndo, IconCity, IconBuilding,
+  IconCalculator, IconConstruction,
+} from "../lib/icons";
 
 /* ─────────────────────────── Types ─────────────────────────── */
 interface Inputs {
@@ -368,7 +374,11 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
     r.executiveSummary.zone === "建议购买区" ? "zone-buy"
     : r.executiveSummary.zone === "继续租房区" ? "zone-rent"
     : "zone-watch";
-  const zoneEmoji = r.executiveSummary.zone === "建议购买区" ? "🏡" : r.executiveSummary.zone === "继续租房区" ? "🏠" : "🔭";
+  const zoneIcon = r.executiveSummary.zone === "建议购买区"
+    ? <IconBuyHouse size={42} />
+    : r.executiveSummary.zone === "继续租房区"
+    ? <IconRentHouse size={42} />
+    : <IconWatch size={42} />;
 
   const scenarioColor = (s: ScenarioComparison) => s.gap > 0 ? "#34d399" : s.gap < 0 ? "#f87171" : "#94a3b8";
 
@@ -377,7 +387,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
       {/* Zone banner */}
       <div className={`glass ${zoneClass}`} style={{ padding: "26px 28px", marginBottom: 20, borderRadius: 22 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-          <span style={{ fontSize: 42 }}>{zoneEmoji}</span>
+          <span style={{ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85 }}>{zoneIcon}</span>
           <div style={{ flex: 1 }}>
             <div className="t-label" style={{ marginBottom: 5, color: "rgba(255,255,255,0.45)" }}>决策分区</div>
             <div className="t-title" style={{ marginBottom: 7 }}>{r.executiveSummary.zone}</div>
@@ -404,7 +414,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Scenarios */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>📊 三情景净资产对比</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconBarChart size={15} /> 三情景净资产对比</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {(r.netWorthComparison.scenarios ?? []).map((s) => {
             const pct = Math.min(96, Math.max(6, Math.abs(s.gap) / Math.max(1, Math.abs(navDiff) * 1.8) * 80 + 8));
@@ -437,7 +447,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Financial baseline */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>💼 财务基线</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconBriefcase size={15} /> 财务基线</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {[
             { label: "月收入估算", value: fmtMon(r.financialBaseline.monthlyIncomeEstimate) },
@@ -457,7 +467,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Buy simulation */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🏡 购房模拟</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconHouse size={15} /> 购房模拟</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           {[
             { label: "首付", value: fmtWan(r.buySimulation.initialCosts.downPayment) },
@@ -492,7 +502,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Rent simulation */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🏠 租房模拟</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconApartment size={15} /> 租房模拟</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 11 }}>
           {(r.rentSimulation.scenarios ?? []).map((s) => (
             <div key={s.label} className="stat-box" style={{ padding: "10px 14px", flex: 1, minWidth: 100 }}>
@@ -509,13 +519,13 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Stress test */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>⚡ 压力测试</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center", gap: 7 }}><IconLightning size={15} /> 压力测试</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {[
             { label: "收入下降 20%", value: `覆盖率 ${(r.stressTest.incomeDrop20.monthlyCoverageRatio * 100).toFixed(0)}%`, ok: r.stressTest.incomeDrop20.safe },
             { label: "收入下降 40%", value: `覆盖率 ${(r.stressTest.incomeDrop40.monthlyCoverageRatio * 100).toFixed(0)}%`, ok: r.stressTest.incomeDrop40.safe },
             { label: "利率上行 +50BP", value: `月供 +${r.stressTest.rateUp50bpMonthlyChange.toLocaleString()} 元`, ok: r.stressTest.rateUp50bpMonthlyChange < 2000 },
-            { label: "失业 6 个月", value: r.stressTest.unemployment6MonthsSafe ? "✓ 备用金充足" : "⚠ 备用金告急", ok: r.stressTest.unemployment6MonthsSafe },
+            { label: "失业 6 个月", value: r.stressTest.unemployment6MonthsSafe ? "✓ 备用金充足" : "备用金告急", ok: r.stressTest.unemployment6MonthsSafe },
           ].map((item) => (
             <div key={item.label} className="stat-box" style={{ padding: "10px 14px", borderColor: item.ok ? "rgba(52,211,153,0.22)" : "rgba(248,113,113,0.22)" }}>
               <div className="t-label" style={{ marginBottom: 3 }}>{item.label}</div>
@@ -527,7 +537,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
 
       {/* Triggers */}
       <div className="glass" style={{ padding: "20px 24px", marginBottom: 18 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>🔔 什么时候可以触发买入？</div>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 7 }}><IconBell size={15} /> 什么时候可以触发买入？</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(r.triggerConditions ?? []).map((c, i) => (
             <div key={i} className="glass-inset" style={{ padding: "10px 14px", fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{c}</div>
@@ -541,7 +551,7 @@ function ReportScreen({ result, inp, onReset }: { result: ModelOutput; inp: Inpu
       </div>
 
       <div style={{ textAlign: "center", paddingBottom: 56 }}>
-        <button className="gl-btn" onClick={onReset} type="button">↩ 重新测算</button>
+        <button className="gl-btn" onClick={onReset} type="button" style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><IconArrowUndo size={15} /> 重新测算</button>
       </div>
     </div>
   );
@@ -685,7 +695,7 @@ export default function WizardPage() {
             <div className="glass" style={{ padding: "24px 26px", marginBottom: 22 }}>
               <Field label="目标城市" desc="影响贷款基准利率、公积金上限与契税政策。">
                 <Chips
-                  options={[{ label: "🌆 上海", value: "上海" as const }, { label: "🏛 北京", value: "北京" as const }]}
+                  options={[{ label: "上海", value: "上海" as const }, { label: "北京", value: "北京" as const }]}
                   value={inputs.target_city}
                   onChange={(v) => dispatch({ target_city: v })}
                 />
@@ -713,7 +723,7 @@ export default function WizardPage() {
                 transition: "border-color 0.2s",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <span style={{ fontSize: 28 }}>🧮</span>
+                  <span style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", color: "#34d399" }}><IconCalculator size={28} /></span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: "#e8eaf0", marginBottom: 3 }}>
                       资产决策引擎版（新）
@@ -754,11 +764,11 @@ export default function WizardPage() {
                 />
                 {inputs.is_new_house ? (
                   <InfoBox color="green">
-                    🏗 新房购买：购房合同签订即为首手，增值税<strong>天然免征</strong>，无需关注持有年限。
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconConstruction size={14} /> 新房购买：购房合同签订即为首手，增值税<strong>天然免征</strong>，无需关注持有年限。</span>
                   </InfoBox>
                 ) : (
                   <InfoBox color="blue">
-                    🏘 二手房：若持有满 {policy.vatExemptHoldingYears} 年，增值税免征；未满则按 {policy.vatNonExemptPct}% 计算。
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconApartment size={14} /> 二手房：若持有满 {policy.vatExemptHoldingYears} 年，增值税免征；未满则按 {policy.vatNonExemptPct}% 计算。</span>
                   </InfoBox>
                 )}
               </Field>
@@ -808,7 +818,7 @@ export default function WizardPage() {
                   />
                   {inputs.holding_years < policy.vatExemptHoldingYears && (
                     <InfoBox color="amber">
-                      ⚠ 持有不满 {policy.vatExemptHoldingYears} 年出售，将额外缴纳 {policy.vatNonExemptPct}% 增值税，约 {fmtW(inputs.P * policy.vatNonExemptPct / 100)}。
+                      持有不满 {policy.vatExemptHoldingYears} 年出售，将额外缴纳 {policy.vatNonExemptPct}% 增值税，约 {fmtW(inputs.P * policy.vatNonExemptPct / 100)}。
                     </InfoBox>
                   )}
                   {inputs.holding_years >= policy.vatExemptHoldingYears && (
@@ -912,13 +922,13 @@ export default function WizardPage() {
                 <div style={{ display: "flex", gap: 10 }}>
                   <LiveStat
                     label="付完首付后剩余流动资金（估）"
-                    value={remainingLiquidWan >= 0 ? `${remainingLiquidWan.toFixed(1)} 万元` : `⚠ 不足`}
+                    value={remainingLiquidWan >= 0 ? `${remainingLiquidWan.toFixed(1)} 万元` : `不足`}
                     sub={remainingLiquidWan < 0 ? "流动资金可能不足，请留意" : "将作为投资本金计入租房路径"}
                   />
                 </div>
                 {remainingLiquidWan < 6 && (
                   <InfoBox color="amber">
-                    ⚠ 购房后可流动资金低于 6 万元，建议确保至少保有 3-6 个月生活开支作为紧急备用金。
+                    购房后可流动资金低于 6 万元，建议确保至少保有 3–6 个月生活开支作为紧急备用金。
                   </InfoBox>
                 )}
               </div>
