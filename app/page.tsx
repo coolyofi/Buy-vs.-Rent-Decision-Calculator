@@ -736,6 +736,35 @@ export default function WizardPage() {
                 </div>
               </div>
             </Link>
+
+            {/* Shanghai eligibility promo */}
+            <Link href="/shanghai" style={{ display: "block", textDecoration: "none", marginTop: 12 }}>
+              <div className="glass-inset" style={{ padding: "16px 20px", borderRadius: 16,
+                border: "1px solid rgba(251,191,36,0.22)", cursor: "pointer",
+                transition: "border-color 0.2s",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ width: 32, height: 32, display: "flex", alignItems: "center",
+                    justifyContent: "center", color: "#fbbf24" }}>
+                    <IconCity size={26} />
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "#e8eaf0" }}>
+                        上海购房资格查询
+                      </span>
+                      <span className="badge badge-amber" style={{ fontSize: 10 }}>
+                        沪七条 2026
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.40)", lineHeight: 1.55 }}>
+                      基于 2026-02-26 新政，查询您是否有资格在上海购房、最多可购几套及公积金上限
+                    </div>
+                  </div>
+                  <span style={{ color: "#fbbf24", fontSize: 18 }}>→</span>
+                </div>
+              </div>
+            </Link>
           </div>
         )}
 

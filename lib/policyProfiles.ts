@@ -89,12 +89,21 @@ export function deriveEffectivePolicy(input: PolicyProfileInput): EffectivePolic
     };
   }
 
-  const gjjSingle = 80;
-  const gjjFamily = hasMultiChild ? 216 : 184;
+  // 沪七条 (2026-02-26) 公积金额度
+  // 首套家庭基础 240 万，多子女 +20%，绿建 +20%，叠加封顶 35%
+  const gjjFamilyBase = 240;
+  const gjjFamilyMultiplier = Math.min(
+    1.0 + (hasMultiChild ? 0.2 : 0) + (isGreen ? 0.2 : 0),
+    1.35,
+  );
+  const gjjFamily = Math.round(gjjFamilyBase * gjjFamilyMultiplier);
+  const gjjSingle = 120; // 沪七条个人上限
+  const gjjMultiChildMax = 324; // 封顶值 240 × 1.35
+
   return {
     city,
-    policyName: "上海 2026 基线政策",
-    policyVersion: "SH-2026.01",
+    policyName: "上海 2026 沪七条",
+    policyVersion: "SH-2026.02",
     dpMinPct: isSecond ? 25 : 20,
     lprPct: 3.5,
     bpBps: isSecond ? 0 : -45,
@@ -108,14 +117,16 @@ export function deriveEffectivePolicy(input: PolicyProfileInput): EffectivePolic
     vatExemptHoldingYears: 2,
     gjjMaxSingleWan: gjjSingle,
     gjjMaxFamilyWan: gjjFamily,
-    gjjMaxMultiChildWan: 216,
+    gjjMaxMultiChildWan: gjjMultiChildMax,
     autoAppliedFactors: [
       `首付下限 ${isSecond ? "25%" : "20%"}`,
       `商贷基准 ${3.5}% + ${-45}BP(首套参考)`,
       `公积金利率 ${isSecond ? "3.075%" : "2.6%"}`,
       `契税 ${isSmall ? (isSecond ? "1%" : "1%") : (isSecond ? "2%" : "1.5%")}`,
-      `增值税 ${holdingYears >= 2 ? "免征" : "5.3%"}`,
-    ],
+      `增值税 ${holdingYears >= 2 ? "免征" : "5.3%"} (满2年即免)`,
+      hasMultiChild ? `多子女公积金上浮至 ${gjjFamily} 万` : "",
+      isGreen ? `绿建公积金上浮至 ${gjjFamily} 万` : "",
+    ].filter(Boolean),
   };
 }
 
